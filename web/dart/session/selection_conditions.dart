@@ -1,4 +1,4 @@
-import 'dart:html';
+import 'package:web/web.dart' as web;
 
 import '../html/component.dart';
 import '../html/popup_panel.dart';
@@ -15,7 +15,7 @@ class SelectionConditions extends Component {
   final Board board;
   final conditionsPopup = PopupPanel('#conds');
 
-  Element get _activeConditionsContainer => queryDom('#activeConds');
+  web.Element get _activeConditionsContainer => queryDom('#activeConds');
 
   SelectionConditions(this.board) : super('#selectionConditions') {
     _initializeAddButton();
@@ -46,20 +46,20 @@ class SelectionConditions extends Component {
     final categories = Condition.categories;
     for (var category in categories) {
       final row = _createGridRow(category);
-      conditionsPopup.htmlRoot.append(row);
+      (conditionsPopup.htmlRoot as dynamic).append(row);
     }
   }
 
-  Element _createGridRow(ConditionCategory category) {
-    final row = DivElement()..className = 'toolbox';
-    final div = DivElement()
-      ..append(ParagraphElement()..text = category.name)
+  web.Element _createGridRow(ConditionCategory category) {
+    final row = web.document.createElement('div') as web.HTMLDivElement..className = 'toolbox';
+    final div = web.document.createElement('div') as web.HTMLDivElement
+      ..append(web.document.createElement('p') as web.HTMLParagraphElement..textContent = category.name)
       ..append(row);
 
     for (var conditionId in category.conditions.keys) {
       final tile = ConditionTile(conditionId, onClick: _onClickPopupCondition);
 
-      row.append(tile.htmlRoot);
+      row.append(tile.htmlRoot as web.Node);
       _popupConditions[conditionId] = tile;
     }
 
@@ -115,7 +115,7 @@ class SelectionConditions extends Component {
       onClick: _onClickActiveCondition,
     );
 
-    _activeConditionsContainer.append(component.htmlRoot);
+    _activeConditionsContainer.append(component.htmlRoot as web.Node);
     _activeConditionTiles[conditionId] = component;
   }
 
@@ -140,7 +140,7 @@ class ConditionTile extends Component {
   bool get highlight => _highlight;
   set highlight(bool value) {
     _highlight = value;
-    htmlRoot.classes.toggle('active', value);
+    htmlRoot.classList.toggle('active', value);
   }
 
   ConditionTile(
@@ -160,7 +160,7 @@ class ConditionTile extends Component {
     this.onClick,
     bool highlight,
   ) : super.element(icon(condition.icon)) {
-    htmlRoot.append(SpanElement()..text = condition.name);
+    htmlRoot.append(web.document.createElement('span') as web.HTMLSpanElement..textContent = condition.name);
 
     htmlRoot.onLMB.listen((_) => onClick(this));
     this.highlight = highlight;

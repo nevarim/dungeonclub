@@ -1,8 +1,9 @@
-import 'dart:html';
+import 'package:web/web.dart' as web;
+import 'dart:js_interop';
 
 const _softLimitCooldownMs = 500;
 
-extension InputLimiter on InputElement {
+extension InputLimiter on web.HTMLInputElement {
   void listenLazyUpdate({
     required void Function(String s) onChange,
     required void Function(String s) onSubmit,
@@ -20,26 +21,26 @@ extension InputLimiter on InputElement {
     }
 
     void onFoc() {
-      startValue = value!;
+      startValue = value;
       if (onFocus != null) onFocus();
-      typedValue = value!;
+      typedValue = value;
     }
 
-    onMouseDown.listen((_) {
+    addEventListener('mousedown', ((web.Event _) {
       // Firefox number inputs can trigger onInput without being focused
-      var isFocused = document.activeElement == this;
+      var isFocused = web.document.activeElement == this;
       if (!isFocused) {
         focus();
         onFoc();
       }
-    });
+    }).toJS);
 
-    this.onFocus.listen((_) => onFoc());
-    this.onChange.listen((_) => update());
-    onInput.listen((_) {
-      onChange(typedValue = value!);
-    });
-    onBlur.listen((_) => update());
+    addEventListener('focus', ((web.Event _) => onFoc()).toJS);
+    addEventListener('change', ((web.Event _) => update()).toJS);
+    addEventListener('input', ((web.Event _) {
+      onChange(typedValue = value);
+    }).toJS);
+    addEventListener('blur', ((web.Event _) => update()).toJS);
   }
 
   void registerSoftLimits({
@@ -49,7 +50,7 @@ extension InputLimiter on InputElement {
     int lastInput = 0;
     num? previousValue = valueAsNumber;
 
-    void onStepChange(Event event, num previous, num value, int now) {
+    void onStepChange(web.Event event, num previous, num value, int now) {
       final min = getMin();
       final max = getMax();
 
@@ -72,13 +73,13 @@ extension InputLimiter on InputElement {
       }
     }
 
-    onInput.listen((event) {
+    addEventListener('input', ((web.Event event) {
       final value = valueAsNumber;
       final previous = previousValue;
 
       final now = DateTime.now().millisecondsSinceEpoch;
 
-      if (value != null && previous != null) {
+      if (previous != null) {
         final diff = (value - previous).abs();
 
         if (diff == 1.0) {
@@ -88,6 +89,6 @@ extension InputLimiter on InputElement {
 
       lastInput = now;
       previousValue = valueAsNumber;
-    });
+    }).toJS);
   }
 }

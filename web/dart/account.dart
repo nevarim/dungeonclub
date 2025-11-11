@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'dart:html';
+import 'dart:js_interop';
+import 'package:web/web.dart' as web;
 
 import '../main.dart';
 import 'game.dart';
@@ -21,7 +22,7 @@ class Account {
         limits = (json['limits'] ?? {}) {
     var token = json['token'];
     if (token != null) {
-      window.localStorage['token'] = token;
+      web.window.localStorage.setItem('token', token.toString());
     }
   }
 
@@ -41,10 +42,10 @@ class Account {
 
   Future displayPickCharacterDialog(String name) async {
     var notif = HtmlNotification('<b>$name</b> wants to join.');
-    document.title = '$name wants to join | $appName';
+    web.document.title = '$name wants to join | $appName';
 
     var letIn = await notif.prompt();
-    document.title = appName;
+    web.document.title = appName;
 
     if (!letIn) return null;
 
@@ -55,6 +56,7 @@ class Account {
     }
 
     var completer = Completer<int>();
+    bool isCompleted = false;
     var chars = user.session!.characters;
 
     var available = chars.where((c) => !c.hasJoined);
@@ -71,29 +73,43 @@ class Account {
       return available.first.id;
     }
 
-    HtmlElement parent = queryDom('#charPick');
-    HtmlElement roster = parent.queryDom('.roster');
-    List.from(roster.children).forEach((e) => e.remove());
+    web.HTMLElement parent = queryDom('#charPick') as web.HTMLElement;
+    web.HTMLElement roster = parent.querySelector('.roster') as web.HTMLElement;
+    for (int i = roster.children.length - 1; i >= 0; i--) {
+      roster.children.item(i)!.remove();
+    }
 
-    parent.queryDom('span').innerHtml = "Pick <b>$name</b>'s Character";
+    (parent.querySelector('span') as web.HTMLElement).innerHTML = "Pick <b>$name</b>'s Character".toJS;
 
     for (var ch in chars) {
-      roster.append(DivElement()
-        ..className = 'char'
-        ..classes.toggle('reserved', ch.hasJoined)
-        ..append(ImageElement(src: ch.image.url))
-        ..append(SpanElement()..text = ch.name)
-        ..onClick.listen((e) {
-          completer.complete(ch.id);
-        }));
+      final div = web.document.createElement('div') as web.HTMLDivElement;
+      div.className = 'char';
+      div.classList.toggle('reserved', ch.hasJoined);
+      
+      final img = web.document.createElement('img') as web.HTMLImageElement;
+      img.src = ch.image.url;
+      div.appendChild(img);
+      
+      final span = web.document.createElement('span') as web.HTMLSpanElement;
+      span.textContent = ch.name;
+      div.appendChild(span);
+      
+      div.addEventListener('click', ((web.Event e) {
+          if (!isCompleted) {
+            isCompleted = true;
+            completer.complete(ch.id);
+          }
+        }).toJS);
+      
+      roster.appendChild(div);
     }
 
     overlayVisible = true;
-    parent.classes.add('show');
+    parent.classList.add('show');
     var result = await completer.future;
 
     overlayVisible = false;
-    parent.classes.remove('show');
+    parent.classList.remove('show');
 
     unawaited(
         user.session!.connectionEvent.firstWhere((join) => join).then((_) {

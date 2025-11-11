@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:html';
+import 'dart:js_interop';
 import 'dart:math';
+import 'package:web/web.dart' as web;
 
 import 'package:dungeonclub/iterable_extension.dart';
 
@@ -35,8 +36,8 @@ class Session extends Game {
   Character? get myCharacter => characters.find((e) => e.id == _charId);
 
   String get inviteLink => isDebugging
-      ? '${window.location.origin}/index.html?game=$id'
-      : window.location.href;
+      ? '${web.window.location.origin}/index.html?game=$id'
+      : web.window.location.href;
 
   ConstantDialog? _dmDisconnectedDialog;
 
@@ -48,10 +49,10 @@ class Session extends Game {
   Session(String id, String name, this.isDM) : super(id, name, isDM) {
     _board = Board(this);
 
-    var url = window.location.href;
+    var url = web.window.location.href;
 
     if (!url.contains(id) && !url.contains(':8080')) {
-      window.history.pushState({}, '', 'game/$id');
+      web.window.history.pushState({}.jsify(), '', 'game/$id');
     }
 
     if (!isDM) {
@@ -61,11 +62,11 @@ class Session extends Game {
 
   void _saveGameId() {
     var idNames = Map<String, String>.from(
-        jsonDecode(window.localStorage['joined'] ?? '{}'));
+        jsonDecode(web.window.localStorage.getItem('joined') ?? '{}'));
 
     // Add joined game id and name to local storage
     idNames[id] = name;
-    window.localStorage['joined'] = jsonEncode(idNames);
+    web.window.localStorage.setItem('joined', jsonEncode(idNames));
   }
 
   String getPlayerColor(int? playerId) {
@@ -100,10 +101,10 @@ class Session extends Game {
     _dmDisconnectedDialog?.close();
     ConstantDialog('You Have Been Kicked')
       ..addParagraph(reason)
-      ..append(ButtonElement()
+      ..append(web.document.createElement('button') as web.HTMLButtonElement
         ..className = 'big'
-        ..text = 'OK'
-        ..onClick.listen((_) => window.location.reload()))
+        ..textContent = 'OK'
+        ..addEventListener('click', (web.Event _) { web.window.location.reload(); }.toJS))
       ..display();
   }
 
@@ -131,7 +132,7 @@ class Session extends Game {
           ..addParagraph('''
               If they happen to reconnect anytime soon,
               you'll return to the game.''')
-          ..append(icon('spinner')..classes.add('spinner'))
+          ..append(icon('spinner')..classList.add('spinner'))
           ..display();
         removeMeasuring(null);
       } else {
@@ -176,7 +177,7 @@ class Session extends Game {
       gameLog('Hello, ${myCharacter!.name}!');
     }
 
-    document.body!.classes.add('is-session');
+    web.document.body!.classList.add('is-session');
     audioplayer.init(this, ambienceJson);
 
     // Depends on global session object
@@ -200,7 +201,7 @@ class Session extends Game {
 
       initializeBoard(sceneJson);
 
-      queryDom('#session').classes.toggle('is-dm', isDM);
+      web.document.querySelector('#session')!.classList.toggle('is-dm', isDM);
 
       _board.mapTab.fromJson(mapJsonList);
     });

@@ -1,6 +1,6 @@
-import 'dart:html';
-import 'dart:svg' as svg;
+import 'package:web/web.dart' as web;
 import 'dart:typed_data';
+import 'dart:math';
 
 import 'package:dungeonclub/measuring/area_of_effect.dart';
 import 'package:dungeonclub/point_json.dart';
@@ -26,17 +26,19 @@ const measuringPort = 80;
 const _precision = 255;
 final Map<int?, Measuring> _pcMeasurings = {};
 
-final HtmlElement _toolbox = queryDom('#measureTools');
-final svg.SvgSvgElement _measuringRoot = queryDom('#measureCanvas');
-final svg.PolygonElement _measuringTile = _measuringRoot.queryDom('#tile');
-final svg.SvgSvgElement _distanceRoot = queryDom('#distanceCanvas');
+final web.HTMLElement _toolbox = queryDom('#measureTools');
+final web.SVGSVGElement _measuringRoot = queryDom('#measureCanvas');
+final web.SVGPolygonElement _measuringTile = _measuringRoot.queryDom('#tile');
+final web.SVGSVGElement _distanceRoot = queryDom('#distanceCanvas');
 
 int _measureMode = 0;
 int get measureMode => _measureMode;
 set measureMode(int measureMode) {
   _measureMode = measureMode;
-  _toolbox.querySelectorAll('.active').classes.remove('active');
-  _toolbox.queryDom('[mode="$measureMode"]').classes.add('active');
+  for (var i = 0; i < _toolbox.querySelectorAll('.active').length; i++) {
+    (_toolbox.querySelectorAll('.active').item(i)! as web.HTMLElement).classList.remove('active');
+  }
+  (_toolbox.queryDom('[mode="$measureMode"]') as web.HTMLElement).classList.add('active');
 }
 
 String getMeasureTooltip() {
@@ -70,7 +72,7 @@ void updateCanvasSvgTile() {
   if (grid is TiledGrid) {
     for (var point in grid.tileShape.points) {
       final p = Point(point.x * grid.tileWidth, point.y * grid.tileWidth);
-      _measuringTile.points.appendItem(_measuringRoot.createSvgPoint()
+      _measuringTile.points.appendItem((_measuringRoot as dynamic).createSVGPoint()
         ..x = p.x
         ..y = p.y);
     }
@@ -148,15 +150,15 @@ abstract class Measuring {
     throw ArgumentError('Invalid measuring type $type');
   }
 
-  final svg.GElement _e;
-  final HtmlElement _distanceText;
+  final web.SVGGElement _e;
+  final web.HTMLElement _distanceText;
   final Point<double> origin;
   final String color;
   bool isLocalPlayer = true;
 
-  Measuring(Point origin, this._e, int? pc, [svg.SvgElement? root])
+  Measuring(Point origin, this._e, int? pc, [web.SVGElement? root])
       : origin = origin.cast<double>(),
-        _distanceText = SpanElement(),
+        _distanceText = web.document.createElement('span') as web.HTMLElement,
         color = user.session!.getPlayerColor(pc) {
     _pcMeasurings[pc]?.dispose();
     _pcMeasurings[pc] = this;
@@ -186,7 +188,7 @@ abstract class Measuring {
   }
 
   void updateDistanceText(double distance) {
-    _distanceText.text = user.session!.board.grid.tileUnitString(distance);
+    _distanceText.textContent = user.session!.board.grid.tileUnitString(distance);
   }
 
   void sendUpdateEvent(Point extra) {
@@ -221,8 +223,8 @@ abstract class Measuring {
 }
 
 class MeasuringPath extends Measuring {
-  final path = svg.PathElement();
-  final lastE = svg.CircleElement()..classes.add('origin');
+  final path = web.SVGPathElement();
+  final lastE = web.SVGCircleElement()..classList.add('origin');
   final points = <Point>[];
   int pointsSinceSync = 0;
   double previousDistance = 0;
@@ -231,7 +233,7 @@ class MeasuringPath extends Measuring {
     Point origin,
     int? pc, {
     bool background = false,
-  }) : super(origin, svg.GElement(), pc,
+  }) : super(origin, web.SVGGElement(), pc,
             background ? _distanceRoot : _measuringRoot) {
     _e
       ..append(path)
@@ -239,7 +241,7 @@ class MeasuringPath extends Measuring {
     handleRightclick(origin);
 
     if (background) {
-      _distanceText.classes.add('slow');
+      _distanceText.classList.add('slow');
     }
   }
 
@@ -265,7 +267,7 @@ class MeasuringPath extends Measuring {
 
   @override
   void handleRightclick(Point p) {
-    var stop = svg.CircleElement()..classes.add('origin');
+    var stop = web.SVGCircleElement()..classList.add('origin');
     _applyCircleGridToWorld(stop, p);
     _e.append(stop);
 
@@ -318,8 +320,8 @@ class MeasuringPath extends Measuring {
 
 abstract class CoveredMeasuring<T extends AreaOfEffectTemplate>
     extends Measuring {
-  final _center = svg.CircleElement()..classes.add('origin');
-  final _tiles = svg.GElement();
+  final _center = web.SVGCircleElement()..classList.add('origin');
+  final _tiles = web.SVGGElement();
   late T _aoe;
 
   late double _tileDistance;
@@ -331,7 +333,7 @@ abstract class CoveredMeasuring<T extends AreaOfEffectTemplate>
     _aoe.isLocal = v;
   }
 
-  CoveredMeasuring(Point origin, int? pc) : super(origin, svg.GElement(), pc) {
+  CoveredMeasuring(Point origin, int? pc) : super(origin, web.SVGGElement(), pc) {
     _applyCircleGridToWorld(_center, origin);
     _tiles.setAttribute('fill', '${color}60');
     _e
@@ -390,11 +392,11 @@ abstract class CoveredMeasuring<T extends AreaOfEffectTemplate>
   }
 
   void _updateTiles() {
-    _tiles.children.clear();
+    while (_tiles.children.length > 0) { _tiles.children.item(0)!.remove(); }
     final tiles = _aoe.getAffectedTiles();
     for (var tile in tiles) {
       final gridPos = (_aoe.grid as TiledGrid).tileCenterInWorld(tile);
-      _tiles.append(svg.UseElement()
+      _tiles.append(web.SVGUseElement()
         ..setAttribute('href', '#tile')
         ..setAttribute('transform', 'translate(${gridPos.x} ${gridPos.y})'));
     }
@@ -483,11 +485,11 @@ class MeasuringLine extends CoveredMeasuring<LineAreaOfEffect> {
       ruleset.aoeLine(origin, painter, grid);
 }
 
-void _applyCircle(svg.CircleElement elem, Point p) {
+void _applyCircle(web.SVGCircleElement elem, Point p) {
   elem.setAttribute('cx', '${p.x}');
   elem.setAttribute('cy', '${p.y}');
 }
 
-void _applyCircleGridToWorld(svg.CircleElement elem, Point p) {
+void _applyCircleGridToWorld(web.SVGCircleElement elem, Point p) {
   _applyCircle(elem, Measuring.getGrid().grid.gridToWorldSpace(p));
 }

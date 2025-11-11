@@ -1,6 +1,7 @@
-import 'dart:html';
+import 'dart:async';
+import 'dart:js_interop';
 import 'dart:math';
-import 'dart:svg' as svg;
+import 'package:web/web.dart' as web;
 
 import 'package:dungeonclub/actions.dart';
 import 'package:dungeonclub/measuring/ruleset.dart';
@@ -11,13 +12,13 @@ import '../../main.dart';
 import '../html_helpers.dart';
 import 'measuring.dart';
 
-final HtmlElement _controls = queryDom('#sceneEditor');
-final InputElement gridTiles = _controls.queryDom('#gridTiles');
-final InputElement _gridTileUnit = _controls.queryDom('#gridTileUnit');
-final InputElement _gridColor = _controls.queryDom('#gridColor');
-final InputElement _gridAlpha = _controls.queryDom('#gridAlpha');
-final DivElement _crop = queryDom('#gridPadding');
-final _typeButtons = <ButtonElement, int>{
+final web.HTMLElement _controls = queryDom('#sceneEditor');
+final web.HTMLInputElement gridTiles = _controls.queryDom('#gridTiles');
+final web.HTMLInputElement _gridTileUnit = _controls.queryDom('#gridTileUnit');
+final web.HTMLInputElement _gridColor = _controls.queryDom('#gridColor');
+final web.HTMLInputElement _gridAlpha = _controls.queryDom('#gridAlpha');
+final web.HTMLDivElement _crop = queryDom('#gridPadding');
+final _typeButtons = <web.HTMLButtonElement, int>{
   queryDom('#gridTSquare'): GRID_SQUARE,
   queryDom('#gridTHexH'): GRID_HEX_H,
   queryDom('#gridTHexV'): GRID_HEX_V,
@@ -27,15 +28,15 @@ final _typeButtons = <ButtonElement, int>{
 const minSize = Point<double>(200, 200);
 
 class SceneGrid {
-  final HtmlElement e = queryDom('#grid');
-  final svg.SvgSvgElement _canvas = queryDom('#gridCanvas');
-  final svg.RectElement _rect = queryDom('#gridCanvasMask');
+  final web.HTMLElement e = queryDom('#grid');
+  final web.SVGSVGElement _canvas = queryDom('#gridCanvas');
+  final web.SVGRectElement _rect = queryDom('#gridCanvasMask');
 
   Grid _grid = Grid.square(1);
   Grid get grid => _grid;
 
-  bool get blink => _canvas.classes.contains('blink');
-  set blink(bool blink) => _canvas.classes.toggle('blink', blink);
+  bool get blink => _canvas.classList.contains('blink');
+  set blink(bool blink) => _canvas.classList.toggle('blink', blink);
 
   int _gridType = GRID_SQUARE;
   int get gridType => _gridType;
@@ -85,7 +86,7 @@ class SceneGrid {
   }
 
   void _validateTileUnit() {
-    var s = _gridTileUnit.value!.replaceFirst(',', '.');
+    var s = _gridTileUnit.value.replaceFirst(',', '.');
 
     // Regex for real numbers (e.g. 0.125 | 10 | 420.69)
     var regex = RegExp(r'\d+(\.\d*)?');
@@ -118,39 +119,44 @@ class SceneGrid {
     });
 
     gridTiles
-      ..onInput.listen((event) {
-        tiles = gridTiles.valueAsNumber!.toInt();
-      })
-      ..onMouseEnter.listen((_) {
+      ..addEventListener('input', ((web.Event event) {
+        tiles = gridTiles.valueAsNumber.toInt();
+      }).toJS)
+      ..addEventListener('mouseenter', ((web.Event _) {
         blink = true;
         redrawCanvas();
-      })
-      ..onMouseLeave.listen((_) {
+      }).toJS)
+      ..addEventListener('mouseleave', ((web.Event _) {
         blink = false;
         redrawCanvas();
-      });
+      }).toJS);
 
-    _gridTileUnit.onChange.listen((_) {
+    _gridTileUnit.addEventListener('change', ((web.Event _) {
       _validateTileUnit();
-    });
+    }).toJS);
 
-    _gridColor.onInput.listen((_) => redrawCanvas());
-    _gridAlpha.onInput.listen((_) => redrawCanvas());
+    _gridColor.addEventListener('input', ((web.Event _) {
+      redrawCanvas();
+    }).toJS);
+    _gridAlpha.addEventListener('input', ((web.Event _) {
+      redrawCanvas();
+    }).toJS);
 
-    _crop.onMouseDown.listen((e) async {
-      if (e.button != 0) return;
-      e.preventDefault();
-      final clicked = e.target as HtmlElement;
+    _crop.addEventListener('mousedown', ((web.Event e) {
+      final mouseEvent = e as web.MouseEvent;
+      if (mouseEvent.button != 0) return;
+      mouseEvent.preventDefault();
+      final clicked = mouseEvent.target as web.HTMLElement;
       final pos1 = offset;
       final size1 = size;
 
       void Function(Point<double>) action;
       if (clicked != _crop) {
         var cursorCss = clicked.style.cursor + ' !important';
-        document.body!.style.cursor = cursorCss;
+        web.document.body!.style.cursor = cursorCss;
         _crop.style.cursor = cursorCss;
 
-        final classes = clicked.classes;
+        final classes = clicked.classList;
         final t = classes.contains('top');
         final r = classes.contains('right');
         final l = classes.contains('left');
@@ -186,20 +192,30 @@ class SceneGrid {
         };
       }
 
-      final mouse1 = Point(e.client.x, e.client.y).cast<double>();
-      final subMove = window.onMouseMove.listen((e) {
-        if (e.movement.magnitude == 0) return;
-        var diff = Point(e.client.x, e.client.y).cast<double>() - mouse1;
+      final mouse1 = Point(mouseEvent.clientX, mouseEvent.clientY).cast<double>();
+      late web.EventListener moveListener;
+      moveListener = ((web.Event e) {
+        final moveEvent = e as web.MouseEvent;
+        var diff = Point(moveEvent.clientX, moveEvent.clientY).cast<double>() - mouse1;
 
         action(diff * (1 / user.session!.board.scaledZoom));
+      }).toJS;
+      
+      web.window.addEventListener('mousemove', moveListener);
+      
+      final mouseUpCompleter = Completer<void>();
+      late web.EventListener mouseUpListener;
+      mouseUpListener = ((web.Event e) {
+        web.window.removeEventListener('mouseup', mouseUpListener);
+        mouseUpCompleter.complete();
+      }).toJS;
+      web.window.addEventListener('mouseup', mouseUpListener);
+      mouseUpCompleter.future.then((_) {
+        web.document.body!.style.cursor = '';
+        _crop.style.cursor = '';
+        web.window.removeEventListener('mousemove', moveListener);
       });
-
-      await window.onMouseUp.first;
-
-      document.body!.style.cursor = '';
-      _crop.style.cursor = '';
-      await subMove.cancel();
-    });
+    }).toJS);
   }
 
   void _repositionMovables() {
@@ -234,7 +250,7 @@ class SceneGrid {
 
   void _applyGrid(int tilesOverride) {
     tiles = tilesOverride;
-    gridTiles.valueAsNumber = tiles;
+    gridTiles.valueAsNumber = tiles.toDouble();
     _applyGridType();
     _applyZero();
     _applySize();
@@ -258,7 +274,7 @@ class SceneGrid {
   void _applyGridType() {
     _measuringRuleset = _defaultRulesetOfType(gridType);
     _typeButtons.forEach((btn, btnType) {
-      btn.classes.toggle('active', btnType == gridType);
+      btn.classList.toggle('active', btnType == gridType);
     });
     updateCanvasSvgTile();
   }
@@ -348,9 +364,9 @@ class SceneGrid {
       'translate(${offset.x}, ${offset.y}) scale($scale)',
     );
 
-    var patternG = pattern.children.first;
-    patternG.setAttribute('stroke', _gridColor.value!);
-    patternG.setAttribute('opacity', _gridAlpha.value!);
+    var patternG = pattern.children.item(0)!;
+    patternG.setAttribute('stroke', _gridColor.value);
+    patternG.setAttribute('opacity', _gridAlpha.value);
   }
 
   void configure({

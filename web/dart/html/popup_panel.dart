@@ -1,3 +1,5 @@
+import 'dart:js_interop';
+import 'package:web/web.dart' as web;
 import 'component.dart';
 
 class PopupPanel extends Component {
@@ -5,10 +7,12 @@ class PopupPanel extends Component {
   bool get visible => _visible;
   set visible(bool visible) {
     _visible = visible;
-    htmlRoot.classes.toggle('show', visible);
+    (htmlRoot).classList.toggle('show', visible);
 
     if (visible) {
-      htmlRoot.onMouseLeave.first.then((_) => this.visible = false);
+      (htmlRoot).addEventListener('mouseleave', (web.Event _) {
+        this.visible = false;
+      }.toJS);
     }
   }
 

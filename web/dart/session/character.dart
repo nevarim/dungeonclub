@@ -1,4 +1,4 @@
-import 'dart:html';
+import 'package:web/web.dart' as web;
 
 import 'package:dungeonclub/actions.dart';
 
@@ -12,9 +12,9 @@ class Character {
   final int id;
   final CharacterPrefab prefab;
 
-  final _onlineIndicator = SpanElement();
-  final _onlineIndicatorName = DivElement();
-  final _onlineIndicatorTooltip = SpanElement();
+  final _onlineIndicator = web.document.createElement('span') as web.HTMLSpanElement;
+  final _onlineIndicatorName = web.document.createElement('div') as web.HTMLDivElement;
+  final _onlineIndicatorTooltip = web.document.createElement('span') as web.HTMLSpanElement;
 
   bool _hasJoined = false;
   bool get hasJoined => _hasJoined;
@@ -22,7 +22,7 @@ class Character {
     _hasJoined = hasJoined;
 
     if (hasJoined) {
-      queryDom('#online').append(_onlineIndicator);
+      (queryDom('#online') as dynamic).append(_onlineIndicator);
     } else {
       _onlineIndicator.remove();
     }
@@ -40,17 +40,19 @@ class Character {
     Map<String, dynamic>? prefabJson,
     bool joined = false,
   }) : prefab = CharacterPrefab(id, name, Resource(avatarUrl)) {
+    final iconElement = icon('circle');
+    (iconElement as dynamic).style.color = color;
     _onlineIndicator
-      ..append(icon('circle')..style.color = color)
-      ..append(_onlineIndicatorName);
+      ..append(iconElement as web.Node)
+      ..append(_onlineIndicatorName as web.Node);
 
     if (session.isDM) {
       _onlineIndicator
         ..className = 'with-tooltip'
-        ..append(_onlineIndicatorTooltip)
-        ..onClick.listen((_) {
+        ..append(_onlineIndicatorTooltip as web.Node)
+        ..addEventListener('click', (web.Event _) {
           socket.sendAction(GAME_KICK, {'pc': id});
-        });
+        } as web.EventListener);
     }
 
     hasJoined = joined;
@@ -73,7 +75,7 @@ class Character {
         );
 
   void applyNameToOnlineIndicator() {
-    _onlineIndicatorTooltip.text = 'Kick $name';
-    _onlineIndicatorName.text = name;
+    _onlineIndicatorTooltip.textContent = 'Kick $name';
+    _onlineIndicatorName.textContent = name;
   }
 }

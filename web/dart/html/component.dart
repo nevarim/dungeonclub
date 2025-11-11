@@ -1,8 +1,8 @@
-import 'dart:html';
+import 'package:web/web.dart' as web;
 
 import '../html_helpers.dart';
 
-class Component<T extends Element> {
+class Component<T extends web.Element> {
   final T htmlRoot;
 
   Component.element(this.htmlRoot);

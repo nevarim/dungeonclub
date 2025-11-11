@@ -1,5 +1,5 @@
-import 'dart:html';
 import 'dart:math';
+import 'package:web/web.dart' as web;
 
 import 'html_helpers.dart';
 
@@ -48,7 +48,7 @@ const icons = [
 ];
 
 class IconWall {
-  final HtmlElement container;
+  final web.HTMLElement container;
   final Random random;
   bool _hasStopped = false;
   int _iconIndex = 0;
@@ -60,7 +60,7 @@ class IconWall {
   }
 
   void spawnParticles() async {
-    var count = window.innerWidth! / 30;
+    var count = web.window.innerWidth / 30;
     for (var i = 0; i < count; i++) {
       createParticle();
       await Future.delayed(Duration(milliseconds: 50));
@@ -76,16 +76,16 @@ class IconWall {
     _iconIndex = (_iconIndex + 1) % icons.length;
     var isBrand = id.startsWith('B');
 
-    var ico = DivElement()
-      ..append(icon(isBrand ? id.substring(1) : id, isBrand: isBrand))
-      ..style.left = '${random.nextDouble() * 140 - 20}%'
-      ..style.top = '${random.nextDouble() * 140 - 20}%'
-      ..style.fontSize = '${random.nextInt(20) + 30}px';
+    var ico = web.document.createElement('div') as web.HTMLDivElement;
+    ico.appendChild(icon(isBrand ? id.substring(1) : id, isBrand: isBrand));
+    ico.style.left = '${random.nextDouble() * 140 - 20}%';
+    ico.style.top = '${random.nextDouble() * 140 - 20}%';
+    ico.style.fontSize = '${random.nextInt(20) + 30}px';
 
     if (random.nextDouble() <= 0.2) {
       ico.style.color = 'var(--color-not-intense)';
     }
-    container.append(ico);
+    container.appendChild(ico);
 
     await Future.delayed(Duration(milliseconds: 100));
 
@@ -97,7 +97,7 @@ class IconWall {
 
     if (!_hasStopped) createParticle();
 
-    ico.classes.add('remove');
+    ico.classList.add('remove');
     await Future.delayed(Duration(seconds: 10));
     ico.remove();
   }

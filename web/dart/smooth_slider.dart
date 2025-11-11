@@ -1,15 +1,15 @@
 import 'dart:async';
-import 'dart:html';
+import 'package:web/web.dart' as web;
 
 class SmoothSlider {
-  final InputElement input;
+  final web.HTMLInputElement input;
   final void Function(num value)? onSmoothChange;
   final num _min;
   final num _max;
   late Timer _timer;
   num _value = 0;
 
-  num get goal => input.valueAsNumber!;
+  num get goal => input.valueAsNumber;
   set goal(num v) => input.valueAsNumber = v;
 
   SmoothSlider(
@@ -17,9 +17,9 @@ class SmoothSlider {
     int stepMs = 20,
     num rangePerSecond = 0.2,
     this.onSmoothChange,
-  })  : _min = num.tryParse(input.min ?? '') ?? 0,
-        _max = num.tryParse(input.max ?? '') ?? 1 {
-    input.classes.add('smooth-bg');
+  })  : _min = num.tryParse(input.min) ?? 0,
+        _max = num.tryParse(input.max) ?? 1 {
+    input.classList.add('smooth-bg');
     _value = goal;
     _applyValue(_value);
 

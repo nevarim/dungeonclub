@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'dart:html';
+import 'dart:js_interop';
+import 'package:web/web.dart' as web;
 import 'dart:math';
 
 import 'package:ambience/ambience.dart';
@@ -26,7 +27,7 @@ class AudioPlayer {
   late SmoothSlider _sFilter;
   late SmoothSlider _sCrowd;
 
-  ButtonElement get skipButton => _root.queryDom('#audioSkip');
+  web.HTMLButtonElement get skipButton => queryDom('#audioSkip') as web.HTMLButtonElement;
 
   num _volumeSfx = 0;
   num get volumeSfx => _volumeSfx;
@@ -42,14 +43,14 @@ class AudioPlayer {
   num get filter => _sFilter.goal;
   set filter(num v) {
     _sFilter.goal = v;
-    _sFilter.input.parent!.queryDom('span').text = _getTooltip(1, v);
+    ((_sFilter.input as dynamic).parentElement.querySelector('span') as web.HTMLElement).textContent = _getTooltip(1, v);
   }
 
   int get weatherIntensity => _sWeather.goal.toInt();
   set weatherIntensity(int v) {
     _sWeather.goal = v;
     _weather.cueClip(v >= 0 ? v.toInt() : null);
-    _sWeather.input.parent!.queryDom('span').text =
+    ((_sWeather.input as dynamic).parentElement.querySelector('span') as web.HTMLElement).textContent =
         'Weather: ${_getTooltip(0, v)}';
   }
 
@@ -57,7 +58,7 @@ class AudioPlayer {
   set crowdedness(int v) {
     _sCrowd.goal = v;
     _crowd.cueClip(v >= 0 ? v.toInt() : null);
-    _sCrowd.input.parent!.queryDom('span').text = 'Crowd: ${_getTooltip(2, v)}';
+    ((_sCrowd.input as dynamic).parentElement.querySelector('span') as web.HTMLElement).textContent = 'Crowd: ${_getTooltip(2, v)}';
   }
 
   String _toUrl(String s) => getFile('ambience/sounds/$s.mp3');
@@ -84,13 +85,13 @@ class AudioPlayer {
     await requireFirstInteraction;
     _setupAmbience();
 
-    window.navigator.mediaSession!
-      ..setActionHandler('play', () {})
-      ..setActionHandler('pause', () {})
-      ..setActionHandler('stop', () {})
-      ..setActionHandler('seekbackward', () {})
-      ..setActionHandler('seekforward', () {})
-      ..setActionHandler('seekto', () {});
+    final mediaSession = web.window.navigator.mediaSession;
+    (mediaSession as dynamic).setActionHandler('play', () {});
+    (mediaSession as dynamic).setActionHandler('pause', () {});
+    (mediaSession as dynamic).setActionHandler('stop', () {});
+    (mediaSession as dynamic).setActionHandler('seekbackward', () {});
+    (mediaSession as dynamic).setActionHandler('seekforward', () {});
+    (mediaSession as dynamic).setActionHandler('seekto', () {});
 
     _input('vMusic', 0.5, (v) => volumeMusic = v);
     _input('vAmbience', 0.5, (v) => volumeSfx = v);
@@ -104,36 +105,39 @@ class AudioPlayer {
       onSmoothChange: (v) => _weather.filter = 20000 - 19800 * pow(v, 0.5),
     );
 
-    var pin = window.localStorage['audioPin'];
-    _root.classes.toggle(
+    var pin = web.window.localStorage.getItem('audioPin');
+    (_root as web.HTMLElement).classList.toggle(
         'keep-open', Environment.enableMusic ? pin != 'false' : pin == 'true');
 
-    _root.queryDom('button').onClick.listen((_) {
-      window.localStorage['audioPin'] = '${_root.classes.toggle('keep-open')}';
+    final button = queryDom('#ambience button') as web.HTMLButtonElement;
+    (button as dynamic).addEventListener('click', (web.Event _) {
+      web.window.localStorage.setItem('audioPin', '${(_root as web.HTMLElement).classList.toggle('keep-open')}');
     });
 
     if (session.isDM) {
-      skipButton.onClick.listen((_) => _sendSkip());
+      (skipButton as dynamic).addEventListener('click', (web.Event _) => _sendSkip());
 
-      for (var pl in _root.queryDom('#playlists').children) {
-        var id = pl.attributes['value'];
+      final playlistsContainer = queryDom('#playlists') as web.HTMLElement;
+      for (var i = 0; i < playlistsContainer.children.length; i++) {
+        final pl = playlistsContainer.children.item(i) as web.HTMLElement;
+        var id = pl.getAttribute('value');
 
         if (json != null && json['playlist'] == id) {
-          pl.classes.add('active');
+          pl.classList.add('active');
         }
 
-        pl.onClick.listen((_) {
-          var doSend = !pl.classes.contains('active');
-          if (doSend) {
-            _root
-                .querySelectorAll('#playlists > .active')
-                .classes
-                .remove('active');
-          }
+        (pl as dynamic).addEventListener('click', (web.Event _) {
+           var doSend = !pl.classList.contains('active');
+           if (doSend) {
+             final activeElements = _root.querySelectorAll('#playlists > .active');
+             for (var j = 0; j < activeElements.length; j++) {
+               (activeElements.item(j) as web.HTMLElement).classList.remove('active');
+             }
+           }
 
-          pl.classes.toggle('active', doSend);
-          _sendPlaylist(doSend ? id : null);
-        });
+           pl.classList.toggle('active', doSend);
+           _sendPlaylist(doSend ? id : null);
+         });
       }
     } else {
       ambienceFromJson(json);
@@ -142,27 +146,28 @@ class AudioPlayer {
     onNewTracklist(json);
   }
 
-  InputElement _input(String id, num? init, void Function(num value) onChange,
+  web.HTMLInputElement _input(String id, num? init, void Function(num value) onChange,
       [bool sendAmbience = false]) {
-    InputElement input = _root.queryDom('#$id');
+    web.HTMLInputElement input = queryDom('#$id') as web.HTMLInputElement;
 
-    final stored = window.localStorage[id] ?? '$init';
-    final initial = num.tryParse(stored) ?? input.valueAsNumber!;
+    final stored = web.window.localStorage.getItem(id) ?? '$init';
+    final initial = num.tryParse(stored) ?? input.valueAsNumber;
 
     input.valueAsNumber = initial;
     scheduleMicrotask(() => onChange(initial));
 
     if (sendAmbience) {
-      input.onChange.listen((_) => _sendAmbience());
+      (input as dynamic).addEventListener('change', (web.Event _) => _sendAmbience());
     }
 
-    return input
-      ..onInput.listen((_) {
-        if (!sendAmbience) {
-          window.localStorage[id] = input.value!;
-        }
-        onChange(input.valueAsNumber!);
-      });
+    (input as dynamic).addEventListener('input', (web.Event _) {
+      if (!sendAmbience) {
+        web.window.localStorage.setItem(id, input.value);
+      }
+      onChange(input.valueAsNumber);
+    });
+    
+    return input;
   }
 
   void _sendAmbience() {
@@ -229,34 +234,34 @@ class AudioPlayer {
   }
 
   void displayTrack(Track? t) {
-    var player = _root.queryDom('#player');
+    var player = queryDom('#player') as web.HTMLElement;
 
     var children = player.children;
-    var title = children[0];
+    var title = children.item(0) as web.HTMLElement;
     if (t != null) {
-      player.classes.remove('hide');
-      title.attributes['href'] = 'https://www.youtube.com/watch?v=${t.id}';
+      player.classList.remove('hide');
+      title.setAttribute('href', 'https://www.youtube.com/watch?v=${t.id}');
     } else {
-      player.classes.add('hide');
+      player.classList.add('hide');
       title.removeAttribute('href');
     }
 
     title.title = t?.title ?? '';
 
     _changeText(title, t?.title ?? '');
-    _changeText(children[1], t?.artist ?? '');
+    _changeText(children.item(1) as web.HTMLElement, t?.artist ?? '');
   }
 
-  Future<void> _changeText(Element e, String content) async {
-    if (e.innerHtml!.trim() != content.trim()) {
-      e.classes.add('transition');
+  Future<void> _changeText(web.HTMLElement e, String content) async {
+    if ((e.innerHTML as String).trim() != content.trim()) {
+      e.classList.add('transition');
       await Future.delayed(Duration(milliseconds: 200));
       if (content != '') {
-        e.innerHtml = content;
-        e.classes.remove('transition');
+        e.innerHTML = content.toJS;
+        e.classList.remove('transition');
       }
     } else {
-      e.classes.remove('transition');
+      e.classList.remove('transition');
     }
   }
 
@@ -270,8 +275,9 @@ class AudioPlayer {
             return 'Light Rain';
           case 1:
             return 'Heavy Rain';
+          default:
+            return 'Unknown';
         }
-        break;
       case 1:
         return 'Outside/Inside';
       case 2:
@@ -282,6 +288,8 @@ class AudioPlayer {
             return 'Tavern';
           case 1:
             return 'Marketplace';
+          default:
+            return 'Unknown';
         }
     }
     throw RangeError('No tooltip for input value $value');

@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:html';
-import 'dart:math' as math;
+import 'dart:math' show Point, max, atan2, pi, sqrt;
+import 'package:web/web.dart' as web;
 
 import 'package:dungeonclub/models/entity_base.dart';
 import 'package:dungeonclub/models/token.dart';
@@ -26,9 +26,9 @@ class Movable extends InstanceComponent
   @override
   String get prefabId => prefab.id;
 
-  final _aura = DivElement();
-  final _barsRoot = UListElement();
-  late final barInstances = InstanceList<TokenBarComponent>(_barsRoot);
+  final _aura = web.document.createElement('div') as web.HTMLDivElement;
+  final _barsRoot = web.document.createElement('ul') as web.HTMLUListElement;
+  late final barInstances = InstanceList<TokenBarComponent>(_barsRoot as dynamic);
 
   String get name => prefab.name;
 
@@ -63,35 +63,35 @@ class Movable extends InstanceComponent
   @override
   set angle(double angle) {
     super.angle = angle;
-    htmlRoot.style.setProperty('--angle', '$angle');
+    (htmlRoot as web.HTMLElement).style.setProperty('--angle', '$angle');
   }
 
   @override
   set invisible(bool invisible) {
     super.invisible = invisible;
-    htmlRoot.classes.toggle('invisible', invisible);
+    (htmlRoot as web.HTMLElement).classList.toggle('invisible', invisible);
   }
 
   set styleActive(bool value) {
-    htmlRoot.classes.toggle('active', value);
+    (htmlRoot as web.HTMLElement).classList.toggle('active', value);
   }
 
-  bool get styleSelected => htmlRoot.classes.contains('selected');
+  bool get styleSelected => (htmlRoot as web.HTMLElement).classList.contains('selected');
   set styleSelected(bool value) {
-    htmlRoot.classes.toggle('selected', value);
+    (htmlRoot as web.HTMLElement).classList.toggle('selected', value);
   }
 
-  bool get stylePinged => htmlRoot.classes.contains('pinged');
+  bool get stylePinged => (htmlRoot as web.HTMLElement).classList.contains('pinged');
   set stylePinged(bool value) {
-    htmlRoot.classes.toggle('pinged', value);
+    (htmlRoot as web.HTMLElement).classList.toggle('pinged', value);
   }
 
   set styleHovered(bool value) {
-    htmlRoot.classes.toggle('hovered', value);
+    (htmlRoot as web.HTMLElement).classList.toggle('hovered', value);
   }
 
   set stylePreventTransition(bool value) {
-    htmlRoot.classes.toggle('no-animate-move', value);
+    (htmlRoot as web.HTMLElement).classList.toggle('no-animate-move', value);
   }
 
   @override
@@ -110,7 +110,7 @@ class Movable extends InstanceComponent
   @override
   set size(int size) {
     super.size = size;
-    htmlRoot.style.setProperty('--size', '$displaySize');
+    (htmlRoot as web.HTMLElement).style.setProperty('--size', '$displaySize');
     applyPosition();
   }
 
@@ -129,20 +129,31 @@ class Movable extends InstanceComponent
     required Point<double>? pos,
     required Iterable<int>? conds,
     bool createTooltip = true,
-  }) : super(DivElement()) {
-    htmlRoot
-      ..className = 'movable'
-      ..append(_aura..className = 'aura')
-      ..append(DivElement()..className = 'ring')
-      ..append(DivElement()..className = 'img rotating')
-      ..append(DivElement()..className = 'conds')
-      ..append(_barsRoot..className = 'bars');
+  }) : super(web.document.createElement('div') as dynamic) {
+    final htmlElement = htmlRoot as web.HTMLElement;
+    htmlElement.className = 'movable';
+    
+    _aura.className = 'aura';
+    htmlElement.appendChild(_aura);
+    
+    final ring = web.document.createElement('div') as web.HTMLDivElement..className = 'ring';
+    htmlElement.appendChild(ring);
+    
+    final img = web.document.createElement('div') as web.HTMLDivElement..className = 'img rotating';
+    htmlElement.appendChild(img);
+    
+    final condsElement = web.document.createElement('div') as web.HTMLDivElement..className = 'conds';
+    htmlElement.appendChild(condsElement);
+    
+    _barsRoot.className = 'bars';
+    htmlElement.appendChild(_barsRoot);
 
     if (createTooltip) {
-      htmlRoot.append(board.transform.registerInvZoom(
-        SpanElement()..className = 'toast',
+      final toast = web.document.createElement('span') as web.HTMLSpanElement..className = 'toast';
+      htmlElement.appendChild(board.transform.registerInvZoom(
+        toast as dynamic,
         scaleByCell: true,
-      ));
+      ) as web.Node);
     }
 
     applyImage();
@@ -220,7 +231,7 @@ class Movable extends InstanceComponent
     final pos = positionScreenSpace;
     board.updateSnapToGrid();
 
-    htmlRoot.style
+    (htmlRoot as web.HTMLElement).style
       ..setProperty('--x', '${pos.x}px')
       ..setProperty('--y', '${pos.y}px');
   }
@@ -235,21 +246,21 @@ class Movable extends InstanceComponent
   }
 
   void updateTooltip() {
-    htmlRoot.queryDom('.toast').text = displayName;
+    htmlRoot.queryDom('.toast').textContent = displayName;
   }
 
   void onPrefabUpdate() {
     if (size == 0) {
-      htmlRoot.style.setProperty('--size', '$displaySize');
+      (htmlRoot as web.HTMLElement).style.setProperty('--size', '$displaySize');
       applyPosition();
     }
-    htmlRoot.classes.toggle('accessible', accessible);
+    (htmlRoot as web.HTMLElement).classList.toggle('accessible', accessible);
     updateTooltip();
   }
 
   void applyImage() {
     final img = prefab.image!.url;
-    htmlRoot.queryDom('.img').style.backgroundImage = 'url($img)';
+    (htmlRoot.queryDom('.img') as web.HTMLElement).style.backgroundImage = 'url($img)';
   }
 
   void roundToGrid() {
@@ -271,14 +282,18 @@ class Movable extends InstanceComponent
 
   void _applyConds() {
     var container = htmlRoot.queryDom('.conds');
-    for (var child in List<Element>.from(container.children)) {
+    for (var i = 0; i < container.children.length; i++) {
+      var child = container.children.item(i)!;
       child.remove();
     }
 
     for (var id in conds) {
       var cond = Condition.items[id]!;
-      container
-          .append(icon(cond.icon)..append(SpanElement()..text = cond.name));
+      final span = web.document.createElement('span') as web.HTMLSpanElement;
+      span.textContent = cond.name;
+      final iconElement = icon(cond.icon);
+      (iconElement as web.HTMLElement).appendChild(span);
+      container.append(iconElement);
     }
   }
 
@@ -292,7 +307,7 @@ class Movable extends InstanceComponent
   void dispose(InstanceList list) async {
     board.initiativeTracker.onRemove(this);
 
-    htmlRoot.classes.add('animate-remove');
+    (htmlRoot as web.HTMLElement).classList.add('animate-remove');
     await Future.delayed(Duration(milliseconds: 500));
 
     final toast = htmlRoot.querySelector('.toast');
@@ -339,16 +354,16 @@ class Movable extends InstanceComponent
 }
 
 class EmptyMovable extends Movable {
-  late SpanElement _labelSpan;
+  late web.HTMLSpanElement _labelSpan;
 
   @override
   set label(String label) {
     super.label = label;
 
-    _labelSpan.text = label;
+    _labelSpan.textContent = label;
     var lines = label.split(' ');
 
-    var length = lines.fold<int>(0, (len, line) => math.max(len, line.length));
+    var length = lines.fold<int>(0, (len, line) => max(len, line.length));
     _labelSpan.style.setProperty('--length', '${length + 1}');
   }
 
@@ -371,9 +386,10 @@ class EmptyMovable extends Movable {
           conds: conds,
           createTooltip: false,
         ) {
-    htmlRoot
-      ..classes.add('empty')
-      ..append(_labelSpan = SpanElement());
+    final htmlElement = htmlRoot as web.HTMLElement;
+    htmlElement.classList.add('empty');
+    _labelSpan = web.document.createElement('span') as web.HTMLSpanElement;
+    htmlElement.appendChild(_labelSpan);
   }
 
   @override
@@ -384,15 +400,15 @@ class EmptyMovable extends Movable {
 }
 
 class AngleArrow {
-  static final HtmlElement container = queryDom('#angleArrow');
-  static final HtmlElement angleCurrent = queryDom('#angleCurrent');
+  static final web.HTMLElement container = queryDom('#angleArrow') as web.HTMLElement;
+  static final web.HTMLElement angleCurrent = queryDom('#angleCurrent') as web.HTMLElement;
 
   bool _visible = false;
   bool get visible => _visible;
   set visible(bool visible) {
     if (_visible == visible) return;
     _visible = visible;
-    container.classes.toggle('show', visible);
+    container.classList.toggle('show', visible);
   }
 
   Point<double> _origin = Point(0.0, 0.0);
@@ -419,12 +435,12 @@ class AngleArrow {
   }
 
   static double _radToDegrees(double rad) {
-    return rad * 180 / math.pi;
+    return rad * 180 / pi;
   }
 
   static double _degBetween(Point<double> a, Point<double> b) {
     final vector = a - b;
-    final radAngleBetween = math.atan2(vector.x, -vector.y);
+    final radAngleBetween = atan2(vector.x, -vector.y);
     return _radToDegrees(radAngleBetween);
   }
 

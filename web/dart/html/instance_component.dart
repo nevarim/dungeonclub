@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'dart:html';
+import 'package:web/web.dart' as web;
 
 import 'component.dart';
 import 'instance_list.dart';
 
-abstract class InstanceComponent<T extends Element> extends Component<T> {
+abstract class InstanceComponent<T extends web.Element> extends Component<T> {
   late List<StreamSubscription> _listeners;
 
   InstanceComponent(T htmlRoot) : super.element(htmlRoot) {

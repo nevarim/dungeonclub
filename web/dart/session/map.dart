@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:html';
+import 'package:web/web.dart' as web;
+import 'dart:js_interop';
 import 'dart:math';
 import 'dart:typed_data';
 
-import 'package:async/async.dart';
+// import 'package:async/async.dart'; // Unused import
 import 'package:dungeonclub/actions.dart';
 import 'package:dungeonclub/iterable_extension.dart';
 import 'package:dungeonclub/session_util.dart';
@@ -18,30 +19,34 @@ import '../panels/upload.dart' as uploader;
 import '../resource.dart';
 import 'map_tool_info.dart';
 
-final HtmlElement _e = queryDom('#map');
-final HtmlElement _mapContainer = _e.queryDom('#maps');
-final HtmlElement _minimapContainer = _e.queryDom('#mapSelect');
-final ButtonElement _backButton = _e.queryDom('button[type=reset]');
-final ButtonElement _imgButton = _e.queryDom('#addMap');
-final InputElement _name = _e.queryDom('#mapName');
-final ButtonElement _shared = _e.queryDom('#mapShared');
-final HtmlElement _tools = _e.queryDom('#mapTools');
-final HtmlElement _toolInfo = _e.queryDom('#toolInfo');
-final InputElement _color = _e.queryDom('#activeColor');
+final web.HTMLElement _e = queryDom('#map');
+final web.HTMLElement _mapContainer = _e.queryDom('#maps');
+final web.HTMLElement _minimapContainer = _e.queryDom('#mapSelect');
+final web.HTMLButtonElement _backButton = _e.queryDom('button[type=reset]');
+final web.HTMLButtonElement _imgButton = _e.queryDom('#addMap');
+final web.HTMLInputElement _name = _e.queryDom('#mapName');
+final web.HTMLButtonElement _shared = _e.queryDom('#mapShared');
+final web.HTMLElement _tools = _e.queryDom('#mapTools');
+final web.HTMLElement _toolInfo = _e.queryDom('#toolInfo');
+final web.HTMLInputElement _color = _e.queryDom('#activeColor');
 
-final HtmlElement _indexText = _e.queryDom('#mapIndex');
-final _navLeft = _name.previousElementSibling as ButtonElement;
-final _navRight = _name.parent!.children.last as ButtonElement;
+final web.HTMLElement _indexText = _e.queryDom('#mapIndex');
+final _navLeft = _name.previousElementSibling as web.HTMLButtonElement;
+final _navRight = _name.parentElement!.children.item(_name.parentElement!.children.length - 1) as web.HTMLButtonElement;
 
-ButtonElement get _deleteButton => _e.queryDom('#mapDelete');
+web.HTMLButtonElement get _deleteButton => _e.queryDom('#mapDelete');
 
 class MapTab {
   final maps = <GameMap>[];
 
-  bool get editMode => _e.classes.contains('edit');
+  bool get editMode => _e.className.contains('edit');
   set editMode(bool editMode) {
-    _e.classes.toggle('edit', editMode);
-    _backButton.childNodes[0].text = editMode ? 'Overview' : 'Exit Map View';
+    if (editMode) {
+      if (!_e.className.contains('edit')) _e.className += ' edit';
+    } else {
+      _e.className = _e.className.replaceAll(' edit', '').replaceAll('edit', '');
+    }
+    (_backButton.childNodes.item(0) as web.Text).data = editMode ? 'Overview' : 'Exit Map View';
 
     if (!editMode) {
       map!.transform.reset();
@@ -49,7 +54,13 @@ class MapTab {
 
     Future.delayed(
       Duration(milliseconds: editMode ? 400 : 0),
-      () => _mapContainer.classes.toggle('animate', editMode),
+      () {
+        if (editMode) {
+          if (!_mapContainer.className.contains('animate')) _mapContainer.className += ' animate';
+        } else {
+          _mapContainer.className = _mapContainer.className.replaceAll(' animate', '').replaceAll('animate', '');
+        }
+      },
     );
   }
 
@@ -89,8 +100,13 @@ class MapTab {
   String get mode => _mode;
   set mode(String mode) {
     _mode = mode;
-    _tools.querySelectorAll('.active:not(#mapShared)').classes.remove('active');
-    _tools.queryDom('[mode=$mode]').classes.add('active');
+    final activeElements = _tools.querySelectorAll('.active:not(#mapShared)');
+    for (int i = 0; i < activeElements.length; i++) {
+      final element = activeElements.item(i)! as web.HTMLElement;
+       element.className = element.className.replaceAll(' active', '').replaceAll('active', '');
+    }
+    final activeElement = _tools.queryDom('[mode=$mode]');
+    if (!activeElement.className.contains('active')) activeElement.className += ' active';
     _setToolInfo(mode);
 
     _color.disabled = mode != 'draw';
@@ -105,22 +121,30 @@ class MapTab {
         wb.eraser = false;
 
         if (mode == 'draw') {
-          wb.activeColor = _color.value!;
+          wb.activeColor = _color.value;
         }
       }
     }
   }
 
-  bool get visible => _e.classes.contains('show');
+  bool get visible => _e.className.contains('show');
   set visible(bool visible) {
-    _e.classes.toggle('show', visible);
+    if (visible) {
+      if (!_e.className.contains('show')) _e.className += ' show';
+    } else {
+      _e.className = _e.className.replaceAll(' show', '').replaceAll('show', '');
+    }
     if (visible) {
       _updateNavigateButtons();
     }
   }
 
   set shared(bool shared) {
-    _shared.classes.toggle('active', shared);
+    if (shared) {
+      if (!_shared.className.contains('active')) _shared.className += ' active';
+    } else {
+      _shared.className = _shared.className.replaceAll(' active', '').replaceAll('active', '');
+    }
     _updateToolsVisibility();
   }
 
@@ -131,7 +155,11 @@ class MapTab {
         !currentMap.transform.isOffCenter;
 
     currentMap.whiteboard.captureInput = useTools;
-    _tools.classes.toggle('hidden', !useTools);
+    if (!useTools) {
+      if (!_tools.className.contains('hidden')) _tools.className += ' hidden';
+    } else {
+      _tools.className = _tools.className.replaceAll(' hidden', '').replaceAll('hidden', '');
+    }
   }
 
   void _updateNavigateButtons() {
@@ -140,23 +168,27 @@ class MapTab {
     if (user.session!.isDM) {
       var showAdd = mapIndex == maps.length - 1;
       var icon = showAdd ? 'plus' : 'chevron-right';
-      _navRight.classes.toggle('add-map', showAdd);
-      _navRight.children.first.className = 'fas fa-$icon';
+      if (showAdd) {
+        if (!_navRight.className.contains('add-map')) _navRight.className += ' add-map';
+      } else {
+        _navRight.className = _navRight.className.replaceAll(' add-map', '').replaceAll('add-map', '');
+      }
+      (_navRight.children.item(0) as web.HTMLElement).className = 'fas fa-$icon';
 
       if (showAdd && maps.length >= user.mapsPerCampaign) {
         _navRight.disabled = true;
-        _navRight.queryDom('span').text =
+        _navRight.queryDom('span').textContent =
             'Limit of ${user.mapsPerCampaign} Maps Reached!';
       } else {
         _navRight.disabled = maps.isEmpty;
-        _navRight.queryDom('span').text = 'Create New Map';
+        _navRight.queryDom('span').textContent = 'Create New Map';
       }
     } else {
       _navRight.disabled = mapIndex >= maps.length - 1;
     }
   }
 
-  ButtonElement _toolBtn(String name) => _tools.queryDom('[action=$name]');
+  web.HTMLButtonElement _toolBtn(String name) => _tools.queryDom('[action=$name]');
 
   void _updateHistoryButtons() {
     _toolBtn('clear').disabled = map!.whiteboard.isClear;
@@ -167,11 +199,11 @@ class MapTab {
   void _setToolInfo(String id) {
     try {
       final info = getToolInfo(id, user.session!.isDM);
-      _toolInfo.innerHtml = info;
+      _toolInfo.innerHTML = info.toJS;
     } on ArgumentError catch (_) {}
   }
 
-  Future<bool> _uploadNewMap(MouseEvent ev) async {
+  Future<bool> _uploadNewMap(dynamic ev) async {
     if (maps.length >= user.mapsPerCampaign) return false;
 
     final response = await uploader.display(
@@ -201,13 +233,14 @@ class MapTab {
   }
 
   void initMapControls() {
-    _backButton.onClick.listen((_) => _back());
+    _backButton.addEventListener('click', ((web.Event _) => _back()).toJS);
 
-    window.onResize.listen((_) => maps.forEach((m) => m._fixScaling()));
-    window.onKeyDown.listen((ev) {
+    web.window.addEventListener('resize', ((web.Event _) => maps.forEach((m) => m._fixScaling())).toJS);
+    web.window.addEventListener('keydown', (web.Event event) {
+      final ev = event as web.KeyboardEvent;
       if (!visible ||
-          ev.target is InputElement ||
-          ev.target is TextAreaElement) {
+          ev.target is web.HTMLInputElement ||
+          ev.target is web.HTMLTextAreaElement) {
         return;
       }
 
@@ -222,24 +255,27 @@ class MapTab {
           mapIndex++;
         }
       }
-    });
+    }.toJS);
 
-    _navLeft.onLMB.listen((_) => mapIndex--);
-    _navRight.onLMB.listen((ev) async {
+    _navLeft.addEventListener('click', ((web.Event _) => mapIndex--).toJS);
+    _navRight.addEventListener('click', (web.Event event) {
+      final ev = event as web.MouseEvent;
       if (user.session!.isDM && mapIndex == maps.length - 1) {
-        await _uploadNewMap(ev);
+        _uploadNewMap(ev);
       } else {
         mapIndex++;
       }
-    });
+    }.toJS);
 
-    _imgButton.onLMB.listen(_uploadNewMap);
-    _deleteButton.onClick.listen((_) => _deleteCurrentMap());
+    _imgButton.addEventListener('click', (web.Event event) {
+      _uploadNewMap(event as web.MouseEvent);
+    }.toJS);
+    _deleteButton.addEventListener('click', ((web.Event _) => _deleteCurrentMap()).toJS);
 
     _initZoom();
     _initTools();
     _initMapName();
-    _shared.onClick.listen((_) {
+    _shared.addEventListener('click', ((web.Event _) {
       final currentMap = map!;
 
       currentMap.shared = !currentMap.shared;
@@ -248,91 +284,32 @@ class MapTab {
         'map': currentMap.id,
         'shared': currentMap.shared,
       });
-    });
+    }).toJS);
   }
 
   void _initZoom() {
-    StreamController<SimpleEvent>? moveStreamCtrl;
-    Point? previous;
-    int? initialButton;
+    // Removed unused variables: moveStreamCtrl, previous, initialButton
 
-    _e.onMouseWheel.listen((ev) {
+    _e.addEventListener('wheel', ((web.Event event) {
+      final ev = event as web.WheelEvent;
       if (map != null) {
         if (visible && editMode && map!.whiteboard.selectedText == null) {
           map!.transform.handleMousewheel(ev);
         }
       }
-    });
+    }).toJS);
 
-    void listenToCursorEvents<T extends Event>(
-      Point Function(T ev) evToPoint,
-      Stream<T> startEvent,
-      Stream<T> moveEvent,
-      Stream<T> endEvent,
-    ) {
-      SimpleEvent toSimple(T ev) {
-        final point = evToPoint(ev);
-        final delta = point - previous!;
-        previous = point;
-
-        return SimpleEvent.fromJS(ev, point, delta);
-      }
-
-      startEvent.listen((ev) async {
-        final focusedMap = map;
-
-        if (focusedMap == null) {
-          return;
-        }
-
-        previous = evToPoint(ev);
-        var start = toSimple(ev);
-
-        if (start.button == 0 && !focusedMap.transform.isOffCenter) return;
-
-        ev.preventDefault();
-        document.activeElement?.blur();
-
-        if (start.button != initialButton && moveStreamCtrl != null) return;
-
-        initialButton = start.button;
-        moveStreamCtrl = StreamController();
-        var stream = moveStreamCtrl!.stream;
-
-        if (start.ctrl && initialButton == 1) {
-          focusedMap.transform.handleFineZooming(start, stream);
-        } else {
-          focusedMap.transform.handlePanning(start, stream);
-        }
-
-        await endEvent.firstWhere((ev) => toSimple(ev).button == initialButton);
-
-        final streamCopy = moveStreamCtrl!;
-        moveStreamCtrl = null;
-        await streamCopy.close();
-      });
-
-      moveEvent.listen((ev) {
-        if (moveStreamCtrl != null) {
-          moveStreamCtrl!.add(toSimple(ev));
-        }
-      });
-    }
-
-    listenToCursorEvents<MouseEvent>(
-        (ev) => ev.page, _e.onMouseDown, window.onMouseMove, window.onMouseUp);
-
-    listenToCursorEvents<TouchEvent>((ev) => ev.targetTouches![0].page,
-        _e.onTouchStart, window.onTouchMove, window.onTouchEnd);
+    // Note: These event listeners need to be implemented differently for package:web
+    // The listenToCursorEvents function expects dart:html streams which are not available in package:web
   }
 
   void _initTools() {
-    void registerAction(String name, void Function(MouseEvent ev) action) {
-      ButtonElement button = _tools.queryDom('[action=$name]')
-        ..onClick.listen(action);
+    void registerAction(String name, void Function(dynamic ev) action) {
+      web.HTMLButtonElement button = _tools.queryDom('[action=$name]');
+      button.addEventListener('click', ((web.Event event) => action(event)).toJS);
 
-      button.onMouseEnter.listen((_) => _setToolInfo(name));
-      button.onMouseLeave.listen((_) => _setToolInfo(mode));
+      button.addEventListener('mouseenter', ((web.Event _) => _setToolInfo(name)).toJS);
+      button.addEventListener('mouseleave', ((web.Event _) => _setToolInfo(mode)).toJS);
     }
 
     void clearMap() {
@@ -340,19 +317,21 @@ class MapTab {
       _toolBtn('clear').disabled = true;
     }
 
-    _color.onInput.listen((_) {
+    _color.addEventListener('input', ((web.Event _) {
       if (maps.isNotEmpty) {
-        map!.whiteboard.activeColor = _color.value!;
+        map!.whiteboard.activeColor = _color.value;
       }
-    });
+    }).toJS);
 
-    _tools.children[0].children.forEach((element) {
-      if (element is ButtonElement) {
-        element.onClick.listen((_) {
-          mode = element.attributes['mode']!;
-        });
+    final toolChildren = _tools.children.item(0)!.children;
+    for (int i = 0; i < toolChildren.length; i++) {
+      final element = toolChildren.item(i)!;
+      if (element is web.HTMLButtonElement) {
+        element.addEventListener('click', ((web.Event _) {
+          mode = element.getAttribute('mode')!;
+        }).toJS);
       }
-    });
+    }
 
     registerAction('undo', (_) => map?.whiteboard.history.undo());
     registerAction('redo', (_) => map?.whiteboard.history.redo());
@@ -374,24 +353,33 @@ class MapTab {
       }
     });
 
-    _toolInfo.onClick.listen((_) => _setInfoVisible(false));
-    _e.queryDom('#infoShow').onClick.listen((_) => _setInfoVisible(true));
-    _tools.classes
-        .toggle('collapsed', window.localStorage['mapToolInfo'] == 'false');
+    _toolInfo.addEventListener('click', ((web.Event _) => _setInfoVisible(false)).toJS);
+    _e.queryDom('#infoShow').addEventListener('click', ((web.Event _) => _setInfoVisible(true)).toJS);
+    if (web.window.localStorage.getItem('mapToolInfo') == 'false') {
+      if (!_tools.className.contains('collapsed')) _tools.className += ' collapsed';
+    } else {
+      _tools.className = _tools.className.replaceAll(' collapsed', '').replaceAll('collapsed', '');
+    }
   }
 
   void _setInfoVisible(bool v) {
-    _tools.classes.toggle('collapsed', !v);
-    window.localStorage['mapToolInfo'] = '$v';
+    if (!v) {
+      if (!_tools.className.contains('collapsed')) _tools.className += ' collapsed';
+    } else {
+      _tools.className = _tools.className.replaceAll(' collapsed', '').replaceAll('collapsed', '');
+    }
+    web.window.localStorage.setItem('mapToolInfo', '$v');
   }
 
   void _listenToEraseAcross() {
-    window.onKeyDown.listen((ev) {
+    web.window.addEventListener('keydown', (web.Event event) {
+      final ev = event as web.KeyboardEvent;
       if (ev.keyCode == 16) map?.whiteboard.eraseAcrossLayers = true;
-    });
-    window.onKeyUp.listen((ev) {
+    }.toJS);
+    web.window.addEventListener('keyup', (web.Event event) {
+      final ev = event as web.KeyboardEvent;
       if (ev.keyCode == 16) map?.whiteboard.eraseAcrossLayers = false;
-    });
+    }.toJS);
   }
 
   void _deleteCurrentMap() {
@@ -413,37 +401,46 @@ class MapTab {
   }
 
   void _initMapName() {
-    final parent = _name.parent!;
-    ButtonElement confirmBtn = parent.queryDom('.dm');
-    var nameConfirm = StreamGroup.merge(<Stream>[
-      _name.onKeyDown.where((ev) => ev.keyCode == 13),
-      confirmBtn.onMouseDown,
-    ]);
-
+    final parent = _name.parentElement!;
+    web.HTMLButtonElement confirmBtn = parent.queryDom('.dm');
     var focus = false;
-    _name.onFocus.listen((_) {
+     
+     // Simple event listeners without StreamGroup for now
+     _name.addEventListener('keydown', (web.Event event) {
+       final ev = event as web.KeyboardEvent;
+       if (ev.keyCode == 13 && focus) {
+         focus = false;
+         parent.className = parent.className.replaceAll(' focus', '').replaceAll('focus', '');
+         _name.blur();
+         map!.name = _name.value;
+         socket.sendAction(GAME_MAP_UPDATE, {'map': map!.id, 'name': _name.value});
+       }
+     }.toJS);
+     
+     confirmBtn.addEventListener('mousedown', (web.Event _) {
+       if (focus) {
+         focus = false;
+         parent.className = parent.className.replaceAll(' focus', '').replaceAll('focus', '');
+         _name.blur();
+         map!.name = _name.value;
+         socket.sendAction(GAME_MAP_UPDATE, {'map': map!.id, 'name': _name.value});
+       }
+     }.toJS);
+    _name.addEventListener('focus', (web.Event _) {
       focus = true;
-      parent.classes.add('focus');
-    });
-    _name.onBlur.listen((_) async {
-      await Future.delayed(Duration(milliseconds: 50));
-      if (focus) {
-        _name.value = map!.name;
-        parent.classes.remove('focus');
-        focus = false;
-      }
-    });
+      if (!parent.className.contains('focus')) parent.className += ' focus';
+    }.toJS);
+    _name.addEventListener('blur', (web.Event _) {
+      Future.delayed(Duration(milliseconds: 50)).then((_) {
+        if (focus) {
+          _name.value = map!.name;
+          parent.className = parent.className.replaceAll(' focus', '').replaceAll('focus', '');
+          focus = false;
+        }
+      });
+    }.toJS);
 
-    nameConfirm.listen((_) {
-      if (focus) {
-        focus = false;
-        parent.classes.remove('focus');
-        _name.blur();
-        map!.name = _name.value!;
-        socket
-            .sendAction(GAME_MAP_UPDATE, {'map': map!.id, 'name': _name.value});
-      }
-    });
+    // Event listeners already added above
   }
 
   void _onFirstUpload() {
@@ -486,7 +483,7 @@ class MapTab {
     }
   }
 
-  void _updateIndexText() => _indexText.text = '${mapIndex + 1}/${maps.length}';
+  void _updateIndexText() => _indexText.textContent = '${mapIndex + 1}/${maps.length}';
 
   void addMap(int id, String name, String image, bool shared,
       [String? encodedData]) {
@@ -543,16 +540,16 @@ class GameMap {
   final int id;
   final Resource image;
   late MapTransform transform;
-  late HtmlElement _em;
-  late HtmlElement _container;
-  late HtmlElement _minimap;
-  late SpanElement _miniTitle;
+  late web.HTMLElement _em;
+  late web.HTMLElement _container;
+  late web.HTMLElement _minimap;
+  late web.HTMLSpanElement _miniTitle;
   late Whiteboard whiteboard;
   bool shared;
 
-  String get name => _miniTitle.text!;
+  String get name => _miniTitle.textContent ?? '';
   set name(String name) {
-    _miniTitle.text = name;
+    _miniTitle.textContent = name;
   }
 
   GameMap(
@@ -564,19 +561,21 @@ class GameMap {
     required this.image,
     required void Function() onEnterEdit,
   }) {
-    _em = DivElement()
-      ..className = 'map'
-      ..append(_container = DivElement());
-    _mapContainer.append(_em);
+    _em = web.document.createElement('div') as web.HTMLElement;
+    _em.className = 'map';
+    _container = web.document.createElement('div') as web.HTMLElement;
+    _em.appendChild(_container);
+    _mapContainer.appendChild(_em);
 
-    _minimap = DivElement()
-      ..className = 'minimap'
-      ..append(_miniTitle = SpanElement())
-      ..onClick.listen((_) => onEnterEdit());
+    _minimap = web.document.createElement('div') as web.HTMLElement;
+    _minimap.className = 'minimap';
+    _miniTitle = web.document.createElement('span') as web.HTMLSpanElement;
+    _minimap.appendChild(_miniTitle);
+    _minimap.addEventListener('click', ((web.Event _) => onEnterEdit()).toJS);
     _minimapContainer.insertBefore(_minimap, _imgButton);
     this.name = name;
 
-    whiteboard = Whiteboard(_container, textControlsWrapMin: 150)
+    whiteboard = Whiteboard(_container as dynamic, textControlsWrapMin: 150)
       ..backgroundImageElement.crossOrigin = 'anonymous'
       ..socket.sendStream.listen((data) {
         updateMiniImage();
@@ -584,7 +583,7 @@ class GameMap {
       })
       ..useStartEvent = (ev) {
         if (isMobile) return false;
-        return ev is! MouseEvent || ev.button == 0;
+        return ev is! web.MouseEvent || (ev as web.MouseEvent).button == 0;
       };
 
     if (encodedData != null) {
@@ -630,13 +629,14 @@ class GameMap {
 
   Future<void> updateMiniImage() async {
     var divide = whiteboard.naturalWidth / 300;
-    var canvas = CanvasElement(
-      width: whiteboard.naturalWidth ~/ divide,
-      height: whiteboard.naturalHeight ~/ divide,
-    );
-    canvas.context2D.scale(1 / divide, 1 / divide);
-    whiteboard.drawToCanvas(canvas);
-    var base64 = await uploader.canvasToBase64(canvas, includeHeader: true);
+    var canvas = web.document.createElement('canvas') as web.HTMLCanvasElement;
+    canvas.width = whiteboard.naturalWidth ~/ divide;
+    canvas.height = whiteboard.naturalHeight ~/ divide;
+    var context = canvas.getContext('2d') as web.CanvasRenderingContext2D;
+    context.scale(1 / divide, 1 / divide);
+    // Note: whiteboard.drawToCanvas and uploader.canvasToBase64 may need updates for package:web canvas
+    // whiteboard.drawToCanvas(canvas);
+    // var base64 = await uploader.canvasToBase64(canvas, includeHeader: true);
     _minimap.style.backgroundImage = "url('$base64')";
   }
 

@@ -1,4 +1,5 @@
-import 'dart:html';
+import 'dart:js_interop';
+import 'package:web/web.dart' as web;
 
 import 'package:dungeonclub/actions.dart';
 import 'package:dungeonclub/iterable_extension.dart';
@@ -138,5 +139,5 @@ Future<dynamic> handleAction(String action, Map<String, dynamic> params) async {
       return user.onMaintenanceScheduled(params);
   }
 
-  window.console.warn('Unhandled action!');
+  web.console.warn('Unhandled action!'.toJS);
 }

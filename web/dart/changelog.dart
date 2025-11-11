@@ -1,4 +1,5 @@
-import 'dart:html';
+import 'dart:js_interop';
+import 'package:web/web.dart' as web;
 
 import 'package:ambience/ambience.dart';
 import 'package:intl/intl.dart';
@@ -9,25 +10,32 @@ import 'html_helpers.dart';
 final changelog = Changelog().._init();
 
 class Changelog {
-  HtmlElement get button => queryDom('#changelogButton');
-  HtmlElement get root => queryDom('#changelog');
+  web.HTMLElement get button => queryDom('#changelogButton') as web.HTMLElement;
+  web.HTMLElement get root => queryDom('#changelog') as web.HTMLElement;
   late int? lastChangeCount;
   late int currentChangeCount;
 
   void _init() {
-    button
-      ..onClick.listen((ev) {
-        var btnClick = ev.target == button;
-        var show = button.classes.toggle('active', btnClick ? null : true);
+    button.addEventListener('click', ((web.MouseEvent ev) {
+      var btnClick = ev.target == button;
+      bool show;
+      if (btnClick) {
+        button.classList.toggle('active');
+        show = button.classList.contains('active');
+      } else {
+        button.classList.add('active');
+        show = true;
+      }
 
-        if (show) {
-          button.classes.remove('new');
-          _updateLastKnown();
-        }
-      })
-      ..onMouseLeave.listen((_) => button.classes.remove('active'));
+      if (show) {
+        button.classList.remove('new');
+        _updateLastKnown();
+      }
+    }).toJS);
+    
+    button.addEventListener('mouseleave', ((web.Event _) => button.classList.remove('active')).toJS);
 
-    var saved = window.localStorage['changelog'];
+    var saved = web.window.localStorage.getItem('changelog');
     if (saved != null) {
       lastChangeCount = int.parse(saved);
     } else {
@@ -37,7 +45,7 @@ class Changelog {
 
   void _updateLastKnown() {
     lastChangeCount = currentChangeCount;
-    window.localStorage['changelog'] = '$lastChangeCount';
+    web.window.localStorage.setItem('changelog', '$lastChangeCount');
   }
 
   Future<void> fetch() async {
@@ -51,22 +59,34 @@ class Changelog {
   }
 
   void _applyLog(List<LoggedChange> changes) {
-    root.querySelectorAll('li').forEach((element) => element.remove());
+    var elements = root.querySelectorAll('li');
+    for (var i = 0; i < elements.length; i++) {
+      var element = elements.item(i);
+      if (element != null) {
+        element.parentNode?.removeChild(element);
+      }
+    }
 
     currentChangeCount = changes.length;
     if (lastChangeCount == null) _updateLastKnown();
 
     var diff = currentChangeCount - lastChangeCount!;
-    if (diff > 0) button.classes.add('new');
+    if (diff > 0) button.classList.add('new');
 
     for (var change in changes) {
       var isNew = diff-- > 0;
 
-      root.append(LIElement()
-        ..innerHtml = change.title
-        ..classes.addAll([if (isNew) 'new'])
-        ..children
-            .addAll(change.changes.map((e) => LIElement()..innerHtml = e)));
+      var li = web.document.createElement('li') as web.HTMLLIElement;
+      li.innerHTML = change.title.toJS;
+      if (isNew) li.classList.add('new');
+      
+      for (var changeText in change.changes) {
+        var subLi = web.document.createElement('li') as web.HTMLLIElement;
+        subLi.innerHTML = changeText.toJS;
+        li.appendChild(subLi);
+      }
+      
+      root.appendChild(li);
     }
   }
 

@@ -1,9 +1,9 @@
-import 'dart:html';
+import 'package:web/web.dart' as web;
 import 'dart:math';
 
 import 'package:dungeonclub/point_json.dart';
 
-final _viewportM = sqrt(1920 / max(window.innerWidth!, window.innerHeight!));
+final _viewportM = sqrt(1920 / max(web.window.innerWidth, web.window.innerHeight));
 final _zoomMin = -1 * _viewportM;
 final _zoomMax = 1.5 / _viewportM;
 
@@ -13,7 +13,7 @@ final _scaledMax = exp(_zoomMax);
 class HtmlTransform {
   bool _isAnimating = false;
   double zoomAmount;
-  final Element element;
+  final web.Element element;
   Point Function()? getMaxPosition;
 
   HtmlTransform(
@@ -51,7 +51,7 @@ class HtmlTransform {
   }
 
   void _transform() {
-    element.style
+    (element as web.HTMLElement).style
       ..setProperty('scale', '$scaledZoom')
       ..transform = 'translate(${position.x}px, ${position.y}px)';
   }
@@ -95,8 +95,8 @@ class HtmlTransform {
 
     final durationMs = '${duration.inMilliseconds}';
 
-    element.style.setProperty('--anim-duration', durationMs);
-    element.classes.add('animate-transform');
+    (element as web.HTMLElement).style.setProperty('--anim-duration', durationMs);
+    element.classList.add('animate-transform');
 
     position = end;
 
@@ -104,7 +104,7 @@ class HtmlTransform {
     await Future.delayed(duration);
 
     _isAnimating = false;
-    element.classes.remove('animate-transform');
+    element.classList.remove('animate-transform');
   }
 
   void handlePanning(SimpleEvent first, Stream<SimpleEvent> moveStream) {
@@ -119,14 +119,14 @@ class HtmlTransform {
     });
   }
 
-  void handleMousewheel(WheelEvent event) {
+  void handleMousewheel(web.WheelEvent event) {
     var v = min(50, event.deltaY.abs()) / 50;
     zoom -= event.deltaY.sign * v * zoomAmount;
   }
 }
 
 class SimpleEvent {
-  List<EventTarget>? path;
+  List<web.EventTarget>? path;
   Point p;
   Point movement;
   bool shift;
@@ -145,11 +145,11 @@ class SimpleEvent {
     this.isMouseDown,
   );
 
-  SimpleEvent.fromJS(Event ev, this.p, this.movement)
-      : path = ev.path,
+  SimpleEvent.fromJS(web.Event ev, this.p, this.movement)
+      : path = [for (int i = 0; i < ev.composedPath().length; i++) ev.composedPath()[i]],
         shift = (ev as dynamic).shiftKey,
         ctrl = (ev as dynamic).ctrlKey,
         alt = (ev as dynamic).altKey,
-        button = ev is MouseEvent ? ev.button : 0,
+        button = ev is web.MouseEvent ? ev.button : 0,
         isMouseDown = ev.type == 'mousedown';
 }

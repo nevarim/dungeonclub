@@ -1,5 +1,5 @@
 import 'dart:math';
-import 'dart:svg' as svg;
+import 'package:web/web.dart' as web;
 
 import 'painter.dart';
 
@@ -18,7 +18,7 @@ class PaintTransform {
 }
 
 class SvgShapePainter extends ShapePainter {
-  final svg.GElement rootElement;
+  final web.SVGGElement rootElement;
   final PaintTransform transform;
 
   SvgShapePainter(this.rootElement, this.transform);
@@ -43,7 +43,7 @@ class SvgShapePainter extends ShapePainter {
   Polygon polygon() => SvgPolygon(transform);
 }
 
-extension SvgAttributeHelper on svg.SvgElement {
+extension SvgAttributeHelper on web.SVGElement {
   void attrPx(String name, dynamic value) {
     setAttribute(name, '${value}px');
   }
@@ -54,17 +54,17 @@ extension SvgAttributeHelper on svg.SvgElement {
   }
 }
 
-abstract class SvgShape<E extends svg.SvgElement> with Shape {
+abstract class SvgShape<E extends web.SVGElement> with Shape {
   final PaintTransform transform;
   final E element;
 
   SvgShape(this.transform, this.element) {
-    element.classes.add('no-fill');
+    element.classList.add('no-fill');
   }
 }
 
-class SvgCircle extends SvgShape<svg.CircleElement> with Circle {
-  SvgCircle(PaintTransform transform) : super(transform, svg.CircleElement());
+class SvgCircle extends SvgShape<web.SVGCircleElement> with Circle {
+  SvgCircle(PaintTransform transform) : super(transform, web.SVGCircleElement());
 
   @override
   set radius(double r) {
@@ -80,8 +80,8 @@ class SvgCircle extends SvgShape<svg.CircleElement> with Circle {
   }
 }
 
-class SvgRect extends SvgShape<svg.RectElement> with Rect {
-  SvgRect(PaintTransform transform) : super(transform, svg.RectElement());
+class SvgRect extends SvgShape<web.SVGRectElement> with Rect {
+  SvgRect(PaintTransform transform) : super(transform, web.SVGRectElement());
 
   @override
   set position(Point p) {
@@ -99,8 +99,8 @@ class SvgRect extends SvgShape<svg.RectElement> with Rect {
   }
 }
 
-class SvgPolygon extends SvgShape<svg.PolygonElement> with Polygon {
-  SvgPolygon(PaintTransform transform) : super(transform, svg.PolygonElement());
+class SvgPolygon extends SvgShape<web.SVGPolygonElement> with Polygon {
+  SvgPolygon(PaintTransform transform) : super(transform, web.SVGPolygonElement());
 
   @override
   void handlePointsChanged() {

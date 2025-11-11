@@ -1,60 +1,69 @@
 import 'dart:async';
-import 'dart:html';
+import 'dart:js_interop';
+import 'package:web/web.dart' as web;
 
 import '../../main.dart';
 import '../html_helpers.dart';
 import 'panel_overlay.dart';
 
-final HtmlElement _panel = queryDom('#joinPanel');
-final InputElement _sessionNameInput = _panel.queryDom('#sessionName')
-  ..onInput.listen((_) => _updateJoinButton());
+final web.HTMLElement _panel = queryDom('#joinPanel');
+final web.HTMLInputElement _sessionNameInput = _panel.queryDom('#sessionName');
 
-final ButtonElement _cancelButton = _panel.queryDom('button.close');
-final ButtonElement _joinButton = _panel.queryDom('button#join');
-final HtmlElement _error = _panel.queryDom('#joinError');
+final web.HTMLButtonElement _cancelButton = _panel.queryDom('button.close');
+final web.HTMLButtonElement _joinButton = _panel.queryDom('button#join');
+final web.HTMLElement _error = _panel.queryDom('#joinError');
 
 Future<void> display(String gameId) async {
   overlayVisible = true;
   _joinButton.disabled = true;
-  _error.text = '';
+  _error.textContent = '';
 
   _sessionNameInput
-    ..value = window.localStorage['name'] ?? ''
+    ..value = web.window.localStorage.getItem('name') ?? ''
     ..select();
 
   _updateJoinButton();
 
   var closer = Completer();
-  var subs = [
-    _joinButton.onClick.listen((_) async {
-      _cancelButton.disabled = true;
-      if (await _tryJoin(gameId)) closer.complete();
+  _sessionNameInput.addEventListener('input', (web.Event _) {
+    _updateJoinButton();
+  }.toJS);
+  
+  _joinButton.addEventListener('click', (web.Event _) {
+    _cancelButton.disabled = true;
+    _tryJoin(gameId).then((success) {
+      if (success) closer.complete();
       _cancelButton.disabled = false;
-    }),
-    _sessionNameInput.onKeyDown.listen((ev) async {
-      if (ev.keyCode == 13 && !_joinButton.disabled) {
-        _cancelButton.disabled = true;
-        if (await _tryJoin(gameId)) closer.complete();
+    });
+  }.toJS);
+  
+  _sessionNameInput.addEventListener('keydown', (web.Event ev) {
+    if ((ev as web.KeyboardEvent).keyCode == 13 && !_joinButton.disabled) {
+      _cancelButton.disabled = true;
+      _tryJoin(gameId).then((success) {
+        if (success) closer.complete();
         _cancelButton.disabled = false;
-      }
-    }),
-    _cancelButton.onClick.listen((event) => closer.complete()),
-  ];
+      });
+    }
+  }.toJS);
+  
+  _cancelButton.addEventListener('click', (web.Event event) {
+    closer.complete();
+  }.toJS);
 
-  _panel.classes.add('show');
+  _panel.classList.add('show');
 
   await closer.future;
-  _panel.classes.remove('show');
-  subs.forEach((s) => s.cancel());
+  _panel.classList.remove('show');
   overlayVisible = false;
 }
 
 Future<bool> _tryJoin(String gameId) async {
-  window.localStorage['name'] = _sessionNameInput.value!;
+  web.window.localStorage.setItem('name', _sessionNameInput.value);
   _joinButton.disabled = true;
   _error
     ..className = ''
-    ..text = 'Access requested...';
+    ..textContent = 'Access requested...';
 
   var err = await user.joinSession(gameId, _sessionNameInput.value);
 
@@ -63,10 +72,10 @@ Future<bool> _tryJoin(String gameId) async {
   _joinButton.disabled = false;
   _error
     ..className = 'bad'
-    ..text = err.message;
+    ..textContent = err.message;
   return false;
 }
 
 void _updateJoinButton() {
-  _joinButton.disabled = _sessionNameInput.value!.isEmpty;
+  _joinButton.disabled = _sessionNameInput.value.isEmpty;
 }

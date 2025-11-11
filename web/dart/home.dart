@@ -1,5 +1,6 @@
 import 'dart:convert';
-import 'dart:html';
+import 'dart:js_interop';
+import 'package:web/web.dart' as web;
 
 import '../main.dart';
 import 'changelog.dart';
@@ -12,41 +13,49 @@ import 'panels/edit_game.dart' as edit_game;
 import 'panels/join_session.dart' as join_session;
 import 'section_page.dart';
 
-final HtmlElement _gamesContainer = queryDom('#gamesContainer');
-final ButtonElement _createGameButton = queryDom('#create');
-final HtmlElement _loginTab = queryDom('#loginTab');
-final ButtonElement _logout = queryDom('#logOut')
-  ..onClick.listen((_) {
-    window.localStorage.remove('token');
-    window.location.reload();
-  });
-HtmlElement get _enterDemoButton => queryDom('#enterDemo');
+final web.HTMLElement _gamesContainer = queryDom('#gamesContainer');
+final web.HTMLButtonElement _createGameButton = queryDom('#create');
+final web.HTMLElement _loginTab = queryDom('#loginTab');
+final web.HTMLButtonElement _logout = queryDom('#logOut');
+web.HTMLElement get _enterDemoButton => queryDom('#enterDemo');
+
+void _initLogoutHandler() {
+  _logout.addEventListener('click', ((web.Event _) {
+    web.window.localStorage.removeItem('token');
+    web.window.location.reload();
+  }).toJS);
+}
 
 final iconWall = IconWall(queryDom('#iconWall'));
 
 Future<void> init() {
   iconWall.spawnParticles();
   changelog.fetch();
+  _initLogoutHandler();
 
-  _enterDemoButton.onClick.listen((_) => user.joinDemo());
+  _enterDemoButton.addEventListener('click', ((web.Event _) {
+    user.joinDemo();
+  }).toJS);
 
-  _createGameButton.onClick.listen((event) async {
+  _createGameButton.addEventListener('click', ((web.Event event) {
     if (!user.registered) {
-      return HtmlNotification('No permissions to create a new game!').display();
+      HtmlNotification('No permissions to create a new game!').display();
+      return;
     }
 
     if (_gamesContainer.children.length > user.campaignsPerAccount) {
-      return HtmlNotification(
+      HtmlNotification(
               'Limit of ${user.campaignsPerAccount} campaigns reached.')
           .display();
+      return;
     }
 
-    final game = await user.account!.createNewGame();
-
-    if (game != null) {
-      _addEnteredGame(game);
-    }
-  });
+    user.account!.createNewGame().then((game) {
+      if (game != null) {
+        _addEnteredGame(game);
+      }
+    });
+  }).toJS);
 
   _displayLocalEnteredGames();
 
@@ -55,56 +64,59 @@ Future<void> init() {
 }
 
 Future<bool> _initLogInTab() async {
-  InputElement loginEmail = queryDom('#loginEmail');
-  InputElement loginPassword = queryDom('#loginPassword');
-  ButtonElement loginButton = queryDom('button#login');
-  HtmlElement loginError = queryDom('#loginError');
-  AnchorElement resetPassword = queryDom('#resetPassword');
-  CheckboxInputElement rememberMe = queryDom('#rememberMe input');
-  rememberMe.checked = window.localStorage['rememberMe'] == 'true';
+  web.HTMLInputElement loginEmail = queryDom('#loginEmail');
+  web.HTMLInputElement loginPassword = queryDom('#loginPassword');
+  web.HTMLButtonElement loginButton = queryDom('button#login');
+  web.HTMLElement loginError = queryDom('#loginError');
+  web.HTMLAnchorElement resetPassword = queryDom('#resetPassword');
+  web.HTMLInputElement rememberMe = queryDom('#rememberMe input');
+  rememberMe.checked = web.window.localStorage.getItem('rememberMe') == 'true';
 
-  resetPassword.onClick.listen((_) => resetPanel.display());
+  resetPassword.addEventListener('click', ((web.Event _) {
+    resetPanel.display();
+  }).toJS);
 
-  loginButton.onClick.listen((_) async {
+  loginButton.addEventListener('click', ((web.Event _) {
     loginButton.disabled = true;
-    loginError.text = null;
+    loginError.textContent = null;
 
-    final doRemember = rememberMe.checked!;
-    if (!doRemember) window.localStorage.remove('token');
+    final doRemember = rememberMe.checked;
+    if (!doRemember) web.window.localStorage.removeItem('token');
 
-    window.localStorage['rememberMe'] = '$doRemember';
+    web.window.localStorage.setItem('rememberMe', '$doRemember');
 
-    var loggedIn = await user.login(
-      loginEmail.value!,
-      loginPassword.value!,
+    user.login(
+      loginEmail.value,
+      loginPassword.value,
       rememberMe: doRemember,
-    );
+    ).then((loggedIn) {
+      if (!loggedIn) {
+        loginError.textContent = 'Failed to log in.';
+        loginButton.disabled = false;
+      } else {
+        loginError.textContent = null;
+      }
+    });
+  }).toJS);
 
-    if (!loggedIn) {
-      loginError.text = 'Failed to log in.';
-      loginButton.disabled = false;
-    } else {
-      loginError.text = null;
-    }
-  });
-
-  var token = window.localStorage['token'];
+  var token = web.window.localStorage.getItem('token');
   if (token != null) {
     if (await user.loginToken(token)) return true;
   }
-  _loginTab.classes.remove('hidden');
+  _loginTab.classList.remove('hidden');
   return false;
 }
 
 void onLogin() {
-  queryDom('#loginText').style.animationPlayState = 'running';
-  _loginTab.classes.add('hidden');
-  _logout.classes.remove('hidden');
+  (queryDom('#loginText') as web.HTMLElement).style.setProperty('animation-play-state', 'running');
+  _loginTab.classList.add('hidden');
+  _logout.classList.remove('hidden');
   _showGamesContainer();
   _displayAccountEnteredGames();
-  querySelectorAll('.acc-enable').forEach((element) {
-    (element as ButtonElement).disabled = false;
-  });
+  final elements = web.document.querySelectorAll('.acc-enable');
+  for (int i = 0; i < elements.length; i++) {
+    (elements.item(i) as web.HTMLButtonElement).disabled = false;
+  }
 }
 
 Future<void> _displayAccountEnteredGames() async {
@@ -119,7 +131,7 @@ Future<void> _displayAccountEnteredGames() async {
 
 Future<void> _displayLocalEnteredGames() async {
   var idNames = Map<String, String>.from(
-      jsonDecode(window.localStorage['joined'] ?? '{}'));
+      jsonDecode(web.window.localStorage.getItem('joined') ?? '{}'));
 
   for (var g in idNames.entries) {
     _addEnteredGame(Game(g.key, g.value, false));
@@ -127,39 +139,53 @@ Future<void> _displayLocalEnteredGames() async {
 }
 
 void _showGamesContainer() {
-  queryDom('#savedGames').style.display = 'flex';
+  (queryDom('#savedGames') as web.HTMLElement).style.setProperty('display', 'flex');
 }
 
 void _addEnteredGame(Game game) {
   _showGamesContainer();
-  HtmlElement nameEl;
-  HtmlElement topRow;
-  var e = DivElement()
+  web.HTMLElement nameEl;
+  web.HTMLElement topRow;
+  var e = web.document.createElement('div') as web.HTMLDivElement
     ..className = 'game'
-    ..setAttribute('id', game.id)
-    ..append(topRow = SpanElement()
-      ..append(nameEl = HeadingElement.h3()..text = game.name))
-    ..append(ButtonElement()
-      ..text = game.owned ? 'Host Session' : 'Join Session'
-      ..onClick.listen((event) {
-        if (game.owned) {
-          user.joinSession(game.id);
-        } else {
-          join_session.display(game.id);
-        }
-      }));
+    ..setAttribute('id', game.id);
+  
+  topRow = web.document.createElement('span') as web.HTMLSpanElement;
+  nameEl = web.document.createElement('h3') as web.HTMLHeadingElement
+    ..textContent = game.name;
+  topRow.appendChild(nameEl);
+  e.appendChild(topRow);
+  
+  var sessionButton = web.document.createElement('button') as web.HTMLButtonElement
+    ..textContent = game.owned ? 'Host Session' : 'Join Session';
+  sessionButton.addEventListener('click', ((web.Event event) {
+    if (game.owned) {
+      user.joinSession(game.id);
+    } else {
+      join_session.display(game.id);
+    }
+  }).toJS);
+  e.appendChild(sessionButton);
 
   if (game.owned) {
-    topRow.append(iconButton('cog', className: 'with-tooltip')
-      ..onClick.listen((_) => edit_game.display(game, nameEl, e))
-      ..append(SpanElement()..text = 'Settings'));
+    var settingsButton = iconButton('cog', className: 'with-tooltip');
+    settingsButton.addEventListener('click', ((web.Event _) {
+      edit_game.display(game, nameEl, e);
+    }).toJS);
+    var settingsSpan = web.document.createElement('span') as web.HTMLSpanElement
+      ..textContent = 'Settings';
+    settingsButton.appendChild(settingsSpan);
+    topRow.appendChild(settingsButton);
   } else {
-    topRow.append(iconButton('times', className: 'with-tooltip')
-      ..onClick.listen((_) {
-        e.remove();
-        _unsaveGame(game.id);
-      })
-      ..append(SpanElement()..text = 'Unsave Campaign'));
+    var unsaveButton = iconButton('times', className: 'with-tooltip');
+    unsaveButton.addEventListener('click', ((web.Event _) {
+      e.remove();
+      _unsaveGame(game.id);
+    }).toJS);
+    var unsaveSpan = web.document.createElement('span') as web.HTMLSpanElement
+      ..textContent = 'Unsave Campaign';
+    unsaveButton.appendChild(unsaveSpan);
+    topRow.appendChild(unsaveButton);
   }
 
   _gamesContainer.insertBefore(e, _createGameButton);
@@ -167,7 +193,7 @@ void _addEnteredGame(Game game) {
 
 void _unsaveGame(String id) {
   var idNames = Map<String, String>.from(
-      jsonDecode(window.localStorage['joined'] ?? '{}'));
+      jsonDecode(web.window.localStorage.getItem('joined') ?? '{}'));
   idNames.remove(id);
-  window.localStorage['joined'] = jsonEncode(idNames);
+  web.window.localStorage.setItem('joined', jsonEncode(idNames));
 }

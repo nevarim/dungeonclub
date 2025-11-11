@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'dart:html';
+import 'dart:js_interop';
+import 'package:web/web.dart' as web;
 
 import 'package:dungeonclub/iterable_extension.dart';
 
@@ -22,7 +23,7 @@ class ColorPalette extends Component {
   final _selectController = StreamController<String>.broadcast(sync: true);
   Stream<String> get onSelect => _selectController.stream;
 
-  ColorPalette(Element htmlRoot, {required List<String> colors})
+  ColorPalette(web.Element htmlRoot, {required List<String> colors})
       : super.element(htmlRoot) {
     for (final color in colors) {
       final tile = ColorTile(color, onSelect: () {
@@ -31,7 +32,7 @@ class ColorPalette extends Component {
       });
 
       _tiles.add(tile);
-      htmlRoot.append(tile.htmlRoot);
+      htmlRoot.appendChild(tile.htmlRoot);
     }
 
     activeColor = colors.first;
@@ -49,16 +50,16 @@ class ColorTile extends Component {
   final void Function() onSelect;
 
   set styleSelected(bool value) {
-    htmlRoot.classes.toggle('selected', value);
+    (htmlRoot as web.HTMLElement).classList.toggle('selected', value);
   }
 
   ColorTile(this.color, {required this.onSelect})
-      : super.element(DivElement()) {
-    htmlRoot
-      ..className = 'color-tile'
-      ..style.setProperty('--color', '$color')
-      ..onClick.listen((_) {
-        onSelect();
-      });
+      : super.element(web.document.createElement('div')) {
+    final element = htmlRoot as web.HTMLElement;
+    element.className = 'color-tile';
+    element.style.setProperty('--color', color);
+    element.addEventListener('click', ((web.Event _) {
+      onSelect();
+    }).toJS);
   }
 }

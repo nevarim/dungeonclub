@@ -1,6 +1,7 @@
-import 'dart:html';
+import 'dart:math';
 
 import 'package:dungeonclub/actions.dart';
+import 'package:web/web.dart' as web;
 
 import '../html_helpers.dart';
 import '../resource.dart';
@@ -15,7 +16,7 @@ class DemoSession extends Session {
   DemoSession() : super(demoId, demoName, true);
 
   void initializeDemo() async {
-    queryDom('#session').classes.add('demo');
+    (queryDom('#session') as web.HTMLElement).classList.add('demo');
 
     var demoPlayers = ['Nathaniel', 'Luke', 'Teo'];
     var characters = <Character>[];

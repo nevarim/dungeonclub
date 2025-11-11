@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'dart:html';
+import 'dart:js_interop';
+import 'package:web/web.dart' as web;
 
 import 'package:dungeonclub/actions.dart';
 
@@ -17,134 +18,158 @@ final CodePanel resetPanel = CodePanel(
     '#resetPanel', ACCOUNT_RESET_PASSWORD, ACCOUNT_RESET_PASSWORD_ACTIVATE);
 
 class CodePanel {
-  final HtmlElement _panel;
+  final web.HTMLElement _panel;
 
-  late HtmlElement _sectionRegister;
-  late HtmlElement _sectionActivate;
+  late web.HTMLElement _sectionRegister;
+  late web.HTMLElement _sectionActivate;
 
-  late InputElement _emailInput;
+  late web.HTMLInputElement _emailInput;
 
-  late InputElement _passwordInput;
+  late web.HTMLInputElement _passwordInput;
 
-  late InputElement _confirmInput;
+  late web.HTMLInputElement _confirmInput;
 
-  late InputElement _codeInput;
-  late SpanElement _emailReader;
+  late web.HTMLInputElement _codeInput;
+  late web.HTMLSpanElement _emailReader;
 
-  late ButtonElement _registerButton;
-  late ButtonElement _activateButton;
+  late web.HTMLButtonElement _registerButton;
+  late web.HTMLButtonElement _activateButton;
 
-  late HtmlElement _errorText1;
-  late HtmlElement _errorText2;
+  late web.HTMLElement _errorText1;
+  late web.HTMLElement _errorText2;
 
-  late ButtonElement _cancelButton;
-  final ButtonElement _loginButton = queryDom('button#login');
+  late web.HTMLButtonElement _cancelButton;
+  final web.HTMLButtonElement _loginButton = queryDom('button#login') as web.HTMLButtonElement;
 
   final String actionSend;
   final String actionVerify;
 
   CodePanel(String panelId, this.actionSend, this.actionVerify)
-      : _panel = queryDom(panelId) {
-    _sectionRegister = _panel.queryDom('.credentials');
-    _sectionActivate = _panel.queryDom('.activate');
+      : _panel = queryDom(panelId) as web.HTMLElement {
+    _sectionRegister = _panel.querySelector('.credentials') as web.HTMLElement;
+    _sectionActivate = _panel.querySelector('.activate') as web.HTMLElement;
 
-    _emailInput = _panel.queryDom('.email')
-      ..onInput.listen((event) => _updateCreateButton());
+    _emailInput = _panel.querySelector('.email') as web.HTMLInputElement
+      ..addEventListener('input', ((web.Event event) => _updateCreateButton()).toJS);
 
-    _passwordInput = _panel.queryDom('.password')
-      ..onInput.listen((event) => _updateCreateButton());
+    _passwordInput = _panel.querySelector('.password') as web.HTMLInputElement
+      ..addEventListener('input', ((web.Event event) => _updateCreateButton()).toJS);
 
-    _confirmInput = _panel.queryDom('.confirm')
-      ..onInput.listen((event) => _updateCreateButton());
+    _confirmInput = _panel.querySelector('.confirm') as web.HTMLInputElement
+      ..addEventListener('input', ((web.Event event) => _updateCreateButton()).toJS);
 
-    _codeInput = _panel.queryDom('.code')
-      ..onInput.listen((_) {
-        _activateButton.disabled = _codeInput.value!.length != 5;
-      });
-    _emailReader = _panel.queryDom('.email-reader');
+    _codeInput = _panel.querySelector('.code') as web.HTMLInputElement
+      ..addEventListener('input', ((web.Event _) {
+        _activateButton.disabled = _codeInput.value.length != 5;
+      }).toJS);
+    _emailReader = _panel.querySelector('.email-reader') as web.HTMLSpanElement;
 
-    _registerButton = _panel.queryDom('.send');
-    _activateButton = _panel.queryDom('.activate-code');
+    _registerButton = _panel.querySelector('.send') as web.HTMLButtonElement;
+    _activateButton = _panel.querySelector('.activate-code') as web.HTMLButtonElement;
 
-    _errorText1 = _sectionRegister.queryDom('p.bad');
-    _errorText2 = _sectionActivate.queryDom('p.bad');
+    _errorText1 = _sectionRegister.querySelector('p.bad') as web.HTMLElement;
+    _errorText2 = _sectionActivate.querySelector('p.bad') as web.HTMLElement;
 
-    _cancelButton = _panel.queryDom('button.close');
+    _cancelButton = _panel.querySelector('button.close') as web.HTMLButtonElement;
   }
 
   Future<void> display() async {
     overlayVisible = true;
-    _loginButton.classes.add('disabled');
+    _loginButton.classList.add('disabled');
     _emailInput.value = '';
     _passwordInput.value = '';
     _confirmInput.value = '';
-    _errorText1.text = '';
-    _errorText2.text = '';
+    _errorText1.textContent = '';
+    _errorText2.textContent = '';
     _updateCreateButton();
 
     var closer = Completer();
-    var subs = [
-      _registerButton.onClick.listen((event) async {
-        _registerButton.disabled = true;
+    bool isCompleted = false;
+    
+    void registerHandler(web.Event event) async {
+      event.preventDefault();
+      _registerButton.disabled = true;
 
-        var moveOn = await socket.request(actionSend, {
-          'email': _emailInput.value,
-          'password': _passwordInput.value,
-        });
+      var moveOn = await socket.request(actionSend, {
+        'email': _emailInput.value,
+        'password': _passwordInput.value,
+      });
 
-        // Yes. I actually DO have to use "== true"!
-        // moveOn can be a string. Checkmate.
-        if (moveOn == true) {
-          _emailReader.text = _emailInput.value;
-          _activateButton.disabled = true;
-          _setSection(_sectionActivate);
-          _codeInput
-            ..value = ''
-            ..focus();
-          blockPageExit = true;
-        } else {
-          _errorText1.text = moveOn;
-          _registerButton.disabled = false;
-        }
-      }),
-      _activateButton.onClick.listen((event) async {
-        _errorText2.text = '';
-        var account = await socket.request(actionVerify, {
-          'code': _codeInput.value,
-        });
-        if (account == null) {
-          _errorText2.text = 'Invalid code!';
-          return;
-        }
+      // Yes. I actually DO have to use "== true"!
+      // moveOn can be a string. Checkmate.
+      if (moveOn == true) {
+        _emailReader.textContent = _emailInput.value;
+        _activateButton.disabled = true;
+        _setSection(_sectionActivate);
+        _codeInput
+          ..value = ''
+          ..focus();
+        blockPageExit = true;
+      } else {
+        _errorText1.textContent = moveOn;
+        _registerButton.disabled = false;
+      }
+    }
+    
+    void activateHandler(web.Event event) async {
+      event.preventDefault();
+      _errorText2.textContent = '';
+      var account = await socket.request(actionVerify, {
+        'code': _codeInput.value,
+      });
+      if (account == null) {
+        _errorText2.textContent = 'Invalid code!';
+        return;
+      }
 
-        user.onActivate(account);
+      user.onActivate(account);
+      if (!isCompleted) {
+        isCompleted = true;
         closer.complete();
-      }),
-      _cancelButton.onClick.listen((event) => closer.complete()),
-    ];
+      }
+    }
+    
+    void cancelHandler(web.Event event) {
+      event.preventDefault();
+      if (!isCompleted) {
+        isCompleted = true;
+        closer.complete();
+      }
+    }
+    
+    _registerButton.addEventListener('click', registerHandler.toJS);
+    _activateButton.addEventListener('click', activateHandler.toJS);
+    _cancelButton.addEventListener('click', cancelHandler.toJS);
 
     _setSection(_sectionRegister);
 
-    _panel.classes.add('show');
+    _panel.classList.add('show');
 
     await closer.future;
-    _panel.classes.remove('show');
-    _loginButton.classes.remove('disabled');
-    subs.forEach((s) => s.cancel());
+    _panel.classList.remove('show');
+    _loginButton.classList.remove('disabled');
+    
+    _registerButton.removeEventListener('click', registerHandler.toJS);
+    _activateButton.removeEventListener('click', activateHandler.toJS);
+    _cancelButton.removeEventListener('click', cancelHandler.toJS);
+    
     overlayVisible = false;
     blockPageExit = false;
   }
 
-  void _setSection(HtmlElement section) {
-    _panel.querySelectorAll('section.show').classes.remove('show');
-    section.classes.add('show');
+  void _setSection(web.HTMLElement section) {
+    final elements = _panel.querySelectorAll('section.show');
+    for (int i = 0; i < elements.length; i++) {
+      (elements.item(i) as web.HTMLElement).classList.remove('show');
+    }
+    section.classList.add('show');
   }
 
-  bool isValidPassword(InputElement pw, InputElement confirm) =>
-      pw.value!.length >= pwLengthMin && pw.value == confirm.value;
+  bool isValidPassword(web.HTMLInputElement pw, web.HTMLInputElement confirm) =>
+      pw.value.length >= pwLengthMin && pw.value == confirm.value;
 
   void _updateCreateButton() {
-    _registerButton.disabled = !_emailInput.value!.contains('@') ||
+    _registerButton.disabled = !_emailInput.value.contains('@') ||
         !isValidPassword(_passwordInput, _confirmInput);
   }
 }

@@ -1,6 +1,7 @@
 import 'dart:convert';
-import 'dart:html';
-import 'dart:svg' as svg;
+import 'dart:js_interop';
+import 'dart:svg';
+import 'package:web/web.dart' as web;
 
 import 'package:dungeonclub/actions.dart';
 import 'package:grid_space/grid_space.dart';
@@ -10,7 +11,7 @@ import 'package:web_polymask/brushes/tool.dart';
 import 'package:web_polymask/polygon_canvas.dart';
 
 import '../communication.dart';
-import '../html_helpers.dart';
+
 import '../panels/dialog.dart';
 import 'board.dart';
 
@@ -26,7 +27,7 @@ class FogOfWar {
   };
 
   final canvas = PolygonCanvas(
-    queryDom('#polymask'),
+    web.document.querySelector('#polymask')! as SvgSvgElement,
     captureInput: false,
     cropMargin: _marginPx,
   )
@@ -34,23 +35,23 @@ class FogOfWar {
     ..movementScale = 2;
 
   String get tooltip => tooltips[canvas.activeTool.runtimeType]!;
-  Element get wrapper => queryDom('#polymaskWrapper');
+  web.Element get wrapper => web.document.querySelector('#polymaskWrapper')!;
 
-  Element? _toolbox;
-  Element get toolbox => _toolbox ??= queryDom('#fogOfWar');
-  Element get btnToolStroke => toolbox.queryDom('#fowStroke');
-  Element get btnToolLasso => toolbox.queryDom('#fowLasso');
-  Element get btnVisible => toolbox.queryDom('#fowPreview');
-  Element get btnFill => toolbox.queryDom('#fowFill');
-  Element get btnGrid => toolbox.queryDom('#fowGrid');
+  web.Element? _toolbox;
+  web.Element get toolbox => _toolbox ??= web.document.querySelector('#fogOfWar')!;
+  web.Element get btnToolStroke => toolbox.querySelector('#fowStroke')!;
+  web.Element get btnToolLasso => toolbox.querySelector('#fowLasso')!;
+  web.Element get btnVisible => toolbox.querySelector('#fowPreview')!;
+  web.Element get btnFill => toolbox.querySelector('#fowFill')!;
+  web.Element get btnGrid => toolbox.querySelector('#fowGrid')!;
 
   String _currentData = '';
   bool _useGrid = true;
   bool get useGrid => _useGrid;
 
-  bool get opaque => wrapper.classes.contains('opaque');
+  bool get opaque => wrapper.classList.contains('opaque');
   set opaque(bool opaque) {
-    wrapper.classes.toggle('opaque', opaque);
+    wrapper.classList.toggle('opaque', opaque);
     btnVisible.className =
         'fas fa-' + (opaque ? 'eye-low-vision' : 'eye active');
   }
@@ -60,25 +61,25 @@ class FogOfWar {
     canvas
       ..onChange = _onPolymaskChange
       ..acceptStartEvent = (ev) {
-        return (ev is! MouseEvent) || ev.button == 0;
+        return (ev is! web.MouseEvent) || (ev as web.MouseEvent).button == 0;
       }
       ..modifyPoint = (p) => p * (1 / board.scaledZoom);
     _updateFillClearButtonDisplay();
     _registerToolButton(board, btnToolStroke, canvas.toolBrushStroke);
     _registerToolButton(board, btnToolLasso, canvas.toolBrushLasso);
     _setTool(canvas.toolBrushStroke);
-    btnFill.onClick.listen((_) => fillAllToggle());
-    btnVisible.onClick.listen((_) {
+    btnFill.addEventListener('click', ((web.Event _) => fillAllToggle()).toJS);
+    btnVisible.addEventListener('click', ((web.Event _) {
       opaque = !opaque;
       _saveSettings();
-    });
-    btnGrid.onClick.listen((_) {
+    }).toJS);
+    btnGrid.addEventListener('click', ((web.Event _) {
       _useGrid = !_useGrid;
       applyUseGrid(board);
       _saveSettings();
-    });
+    }).toJS);
 
-    final settings = window.localStorage['fogOfWar'];
+    final settings = web.window.localStorage.getItem('fogOfWar');
     if (settings != null) {
       _settingsFromJson(board, jsonDecode(settings));
     }
@@ -88,31 +89,34 @@ class FogOfWar {
 
   void _saveSettings() {
     final json = _settingsToJson();
-    window.localStorage['fogOfWar'] = jsonEncode(json);
+    web.window.localStorage.setItem('fogOfWar', jsonEncode(json));
   }
 
   void applyUseGrid(Board board) {
-    btnGrid.classes.toggle('active', useGrid);
+    btnGrid.classList.toggle('active', useGrid);
     canvas.grid = canvas.grid = useGrid ? board.grid.grid : Grid.unclamped();
   }
 
   void setSvgPatternScaling(double scale) {
     canvas.root
-        .queryDom('#barrier')
+        .querySelector('#barrier')!
         .setAttribute('patternTransform', 'rotate(45 50 50) scale($scale)');
   }
 
   void _setTool(PolygonTool tool) {
     canvas.activeTool = tool;
-    btnToolStroke.parent!.querySelectorAll('.active').classes.remove('active');
-    toolbox.queryDom('[tool=${tool.id}]').classes.add('active');
+    final elements = btnToolStroke.parentElement!.querySelectorAll('.active');
+    for (int i = 0; i < elements.length; i++) {
+      (elements.item(i)! as web.Element).classList.remove('active');
+    }
+    toolbox.querySelector('[tool=${tool.id}]')!.classList.add('active');
   }
 
-  void _registerToolButton(Board board, Element btn, PolygonTool tool) {
-    btn.onClick.listen((ev) {
+  void _registerToolButton(Board board, web.Element btn, PolygonTool tool) {
+    btn.addEventListener('click', ((web.Event ev) {
       _setTool(tool);
       board.displayTooltip(tooltip);
-    });
+    }).toJS);
   }
 
   void load(String? data) {
@@ -146,18 +150,16 @@ class FogOfWar {
 
   // Force browsers to redraw SVG
   void fixSvgInit(int width, int height) {
-    svg.RectElement maskRect = canvas.root.queryDom('mask rect');
+    web.SVGRectElement maskRect = canvas.root.querySelector('mask rect')! as web.SVGRectElement;
 
-    var unit = svg.Length.SVG_LENGTHTYPE_PX;
-    maskRect.width!.baseVal!.newValueSpecifiedUnits(unit, width + _marginPx);
-    maskRect.height!.baseVal!.newValueSpecifiedUnits(unit, height + _marginPx);
+    maskRect.width.baseVal.newValueSpecifiedUnits(web.SVGLength.SVG_LENGTHTYPE_PX, width + _marginPx);
+    maskRect.height.baseVal.newValueSpecifiedUnits(web.SVGLength.SVG_LENGTHTYPE_PX, height + _marginPx);
   }
 
   void _updateFillClearButtonDisplay() {
     var icon = canvas.isEmpty ? 'paint-roller' : 'xmark';
-    btnFill
-      ..className = 'fas fa-$icon'
-      ..queryDom('span').text = canvas.isEmpty ? 'Fill Scene' : 'Clear Scene';
+    btnFill.className = 'fas fa-$icon';
+    btnFill.querySelector('span')!.textContent = canvas.isEmpty ? 'Fill Scene' : 'Clear Scene';
   }
 
   void _onPolymaskChange() {

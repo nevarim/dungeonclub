@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'dart:html';
+import 'dart:js_interop';
+import 'package:web/web.dart' as web;
 
 import '../../main.dart';
 import '../html_helpers.dart';
@@ -8,7 +9,9 @@ final _e = queryDom('#contextMenu');
 
 class ContextMenu {
   ContextMenu() {
-    _e.children.clear();
+    while (_e.children.length > 0) {
+      _e.children.item(0)!.remove();
+    }
   }
 
   int addButton(String label, String icon, [String? className]) {
@@ -16,59 +19,94 @@ class ContextMenu {
     return _e.children.length - 1;
   }
 
-  bool _prefer(EventTarget e) {
-    return e is ButtonElement ||
-        (e is Element && e.classes.contains('with-tooltip'));
+  bool _prefer(web.EventTarget e) {
+    return e is web.HTMLButtonElement ||
+        (e is web.HTMLElement && e.classList.contains('with-tooltip'));
   }
 
-  Future<int?> display(MouseEvent event, [Element? hovered]) async {
+  Future<int?> display(web.MouseEvent event, [web.HTMLElement? hovered]) async {
     hovered ??=
-        event.path.firstWhere(_prefer, orElse: () => event.target!) as Element;
-    var p = event.page;
+        event.composedPath().toDart.cast<web.EventTarget>().firstWhere(_prefer, orElse: () => event.target!) as web.HTMLElement;
+    var px = event.pageX;
+    var py = event.pageY;
 
     var startsHovered = true;
-    var bottom = window.innerHeight! - p.y;
+    var bottom = web.window.innerHeight - py;
     if (bottom > 120) {
-      _e.style
-        ..top = '${p.y - 12}px'
-        ..bottom = 'auto';
+      (_e as web.HTMLElement).style.top = '${py - 12}px';
+      (_e as web.HTMLElement).style.bottom = 'auto';
     } else {
-      _e.style
-        ..bottom = '12px'
-        ..top = 'auto';
+      (_e as web.HTMLElement).style.bottom = '12px';
+      (_e as web.HTMLElement).style.top = 'auto';
     }
 
-    var right = window.innerWidth! - p.x;
+    var right = web.window.innerWidth - px;
     if (right > 180) {
-      _e.style
-        ..left = '${p.x}px'
-        ..right = 'auto';
+      (_e as web.HTMLElement).style.left = '${px}px';
+      (_e as web.HTMLElement).style.right = 'auto';
     } else {
       startsHovered = false;
-      _e.style
-        ..right = '12px'
-        ..left = 'auto';
+      (_e as web.HTMLElement).style.right = '12px';
+      (_e as web.HTMLElement).style.left = 'auto';
     }
 
-    _e.classes.add('show');
-    hovered.classes.add('hovered');
+    (_e as web.HTMLElement).classList.add('show');
+    hovered.classList.add('hovered');
 
-    var ev = await Future.any(isMobile
-        ? [window.onTouchStart.first]
-        : [
-            _e.onMouseLeave.first,
-            _e.onMouseUp
-                .where((event) => event.target != _e)
-                .elementAt(startsHovered ? 0 : 1),
-          ]);
+    late web.Event ev;
+    if (isMobile) {
+      final completer = Completer<web.Event>();
+      var isCompleted = false;
+      void handler(web.Event e) {
+        if (!isCompleted) {
+          isCompleted = true;
+          completer.complete(e);
+          web.window.removeEventListener('touchstart', handler.toJS);
+        }
+      }
+      web.window.addEventListener('touchstart', handler.toJS);
+      ev = await completer.future;
+    } else {
+       final completer = Completer<web.Event>();
+       var mouseUpCount = 0;
+       var isCompleted = false;
+       
+       late void Function(web.Event) mouseLeaveHandler;
+       late void Function(web.Event) mouseUpHandler;
+       
+       mouseLeaveHandler = (web.Event e) {
+          if (!isCompleted) {
+            isCompleted = true;
+            completer.complete(e);
+            (_e as web.HTMLElement).removeEventListener('mouseleave', mouseLeaveHandler.toJS);
+            (_e as web.HTMLElement).removeEventListener('mouseup', mouseUpHandler.toJS);
+          }
+        };
+        
+        mouseUpHandler = (web.Event e) {
+          if (e.target != _e) {
+            mouseUpCount++;
+            if (mouseUpCount > (startsHovered ? 0 : 1) && !isCompleted) {
+              isCompleted = true;
+              completer.complete(e);
+              (_e as web.HTMLElement).removeEventListener('mouseleave', mouseLeaveHandler.toJS);
+              (_e as web.HTMLElement).removeEventListener('mouseup', mouseUpHandler.toJS);
+            }
+          }
+        };
+       
+       (_e as web.HTMLElement).addEventListener('mouseleave', mouseLeaveHandler.toJS);
+       (_e as web.HTMLElement).addEventListener('mouseup', mouseUpHandler.toJS);
+       ev = await completer.future;
+     }
 
-    _e.classes.remove('show');
-    hovered.classes.remove('hovered');
+    (_e as web.HTMLElement).classList.remove('show');
+    hovered.classList.remove('hovered');
 
     if (!isMobile && ev.type == 'mouseleave') return null;
 
     for (var i = 0; i < _e.children.length; i++) {
-      if (ev.path.contains(_e.children[i])) {
+      if (ev.composedPath().toDart.contains(_e.children.item(i))) {
         return i;
       }
     }

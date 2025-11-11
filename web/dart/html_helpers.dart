@@ -1,38 +1,40 @@
-import 'dart:html';
+import 'package:web/web.dart' as web;
 
-E queryDom<E extends Element>(String selectors) {
-  return document.querySelector(selectors) as E;
+E queryDom<E extends web.Element>(String selectors) {
+  return web.document.querySelector(selectors) as E;
 }
 
-extension ElementExtension on Element {
-  E queryDom<E extends Element>(String selectors) {
+extension ElementExtension on web.Element {
+  E queryDom<E extends web.Element>(String selectors) {
     return this.querySelector(selectors) as E;
   }
 }
 
-Element icon(String id, {bool isBrand = false}) {
-  final element = Element.tag('i');
+web.Element icon(String id, {bool isBrand = false}) {
+  final element = web.document.createElement('i');
   applyIconClasses(element, id);
 
   return element;
 }
 
-void applyIconClasses(Element element, String iconId, {bool isBrand = false}) {
-  element.classes = [
+void applyIconClasses(web.Element element, String iconId, {bool isBrand = false}) {
+  element.className = [
     isBrand ? 'fab' : 'fas',
     'fa-$iconId',
-  ];
+  ].join(' ');
 }
 
 String iconHtml(String id) {
   return '<i class="fas fa-$id"></i>';
 }
 
-ButtonElement iconButton(String ico, {String? className, String? label}) =>
-    ButtonElement()
-      ..classes = {'icon', if (className != null) className}
-      ..text = label
-      ..append(icon(ico));
+web.HTMLButtonElement iconButton(String ico, {String? className, String? label}) {
+  final button = web.document.createElement('button') as web.HTMLButtonElement;
+  button.className = ['icon', if (className != null) className].join(' ');
+  if (label != null) button.textContent = label;
+  button.appendChild(icon(ico));
+  return button;
+}
 
 String formatToHtml(
   String text, {

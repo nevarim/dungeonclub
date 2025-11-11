@@ -1,41 +1,57 @@
 import 'dart:async';
-import 'dart:html';
+import 'dart:js_interop';
+import 'package:web/web.dart' as web;
 
 import 'html_helpers.dart';
 
 class HtmlNotification {
-  static final _parent = queryDom('#notifications') as HtmlElement;
-  final HtmlElement e;
+  static final _parent = queryDom('#notifications') as web.HTMLElement;
+  final web.HTMLElement e;
 
   HtmlNotification(String msg)
-      : e = DivElement()
-          ..className = 'notification'
-          ..append(SpanElement()..innerHtml = msg);
+      : e = web.document.createElement('div') as web.HTMLElement {
+    e.className = 'notification';
+    var span = web.document.createElement('span') as web.HTMLElement;
+    span.innerHTML = msg.toJS;
+    e.appendChild(span);
+  }
 
   void display() {
-    _parent.append(
-        e..append(iconButton('times')..onClick.listen((e) => remove())));
+    var closeBtn = iconButton('times') as web.HTMLElement;
+    closeBtn.addEventListener('click', ((web.Event _) => remove()).toJS);
+    e.appendChild(closeBtn);
+    _parent.appendChild(e);
   }
 
   Future<bool> prompt() {
     var completer = Completer<bool>();
-    e.append(iconButton('check', className: 'good')
-      ..onClick.listen((e) {
+    var isCompleted = false;
+    
+    var checkBtn = iconButton('check', className: 'good') as web.HTMLElement;
+    checkBtn.addEventListener('click', ((web.Event _) {
+      if (!isCompleted) {
+        isCompleted = true;
         completer.complete(true);
         remove();
-      }));
+      }
+    }).toJS);
+    e.appendChild(checkBtn);
 
-    e.append(iconButton('times', className: 'bad')
-      ..onClick.listen((e) {
+    var timesBtn = iconButton('times', className: 'bad') as web.HTMLElement;
+    timesBtn.addEventListener('click', ((web.Event _) {
+      if (!isCompleted) {
+        isCompleted = true;
         completer.complete(false);
         remove();
-      }));
+      }
+    }).toJS);
+    e.appendChild(timesBtn);
 
-    _parent.append(e);
+    _parent.appendChild(e);
     return completer.future;
   }
 
   void remove() {
-    e.remove();
+    e.parentNode?.removeChild(e);
   }
 }

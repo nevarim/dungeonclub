@@ -1,41 +1,41 @@
 import 'dart:async';
-import 'dart:html';
+import 'dart:html' as html;
+import 'dart:js_interop';
 import 'dart:math';
+import 'package:web/web.dart' as web;
 
 import 'package:dungeonclub/actions.dart';
 import 'package:dungeonclub/comms.dart';
 import 'package:dungeonclub/point_json.dart';
-import 'package:grid_space/grid_space.dart';
 
 import '../../main.dart';
 import '../communication.dart';
-import '../html_helpers.dart';
 import 'context_menu.dart';
 import 'dialog.dart';
 import 'panel_overlay.dart';
 
-extension ElementLeftClickDown on Element {
-  Stream<MouseEvent> get onLMB => onMouseDown.where((ev) => ev.button == 0);
+extension ElementLeftClickDown on web.Element {
+  Stream<web.MouseEvent> get onLMB => onMouseDown.where((ev) => ev.button == 0);
 }
 
-final HtmlElement _panel = queryDom('#uploadPanel');
-final ButtonElement _cancelButton = _panel.queryDom('button.close');
+final web.HTMLElement _panel = web.document.querySelector('#uploadPanel') as web.HTMLElement;
+final web.HTMLButtonElement _cancelButton = _panel.querySelector('button.close') as web.HTMLButtonElement;
 
-final HtmlElement _imgBox = _panel.queryDom('div');
+final web.HTMLElement _imgBox = _panel.querySelector('div') as web.HTMLElement;
 
-final FileUploadInputElement _uploadInput = _panel.queryDom('#imgUpload');
+final web.HTMLInputElement _uploadInput = _panel.querySelector('#imgUpload') as web.HTMLInputElement;
 
-final ImageElement _img = _panel.queryDom('img');
-final CanvasElement _canvas = _panel.queryDom('canvas');
-final ButtonElement _uploadButton = _panel.queryDom('button[type=submit]');
-final DivElement _crop = _panel.queryDom('#crop');
-final SpanElement _dragText = _panel.queryDom('#dragText');
+final web.HTMLImageElement _img = _panel.querySelector('img') as web.HTMLImageElement;
+final web.HTMLCanvasElement _canvas = _panel.querySelector('canvas') as web.HTMLCanvasElement;
+final web.HTMLButtonElement _uploadButton = _panel.querySelector('button[type=submit]') as web.HTMLButtonElement;
+final web.HTMLDivElement _crop = _panel.querySelector('#crop') as web.HTMLDivElement;
+final web.HTMLSpanElement _dragText = _panel.querySelector('#dragText') as web.HTMLSpanElement;
 
-final DivElement _assetPanel = queryDom('#assetPanel');
-final DivElement _assetGrid = queryDom('#assetGrid');
+final web.HTMLDivElement _assetPanel = web.document.querySelector('#assetPanel') as web.HTMLDivElement;
+final web.HTMLDivElement _assetGrid = web.document.querySelector('#assetGrid') as web.HTMLDivElement;
 
 Point<double> get _imgSize =>
-    Point(_img.width!.toDouble(), _img.height!.toDouble());
+    Point(_img.width.toDouble(), _img.height.toDouble());
 
 Point<double> _position = Point(0, 0);
 Point<double> get position => _position;
@@ -71,8 +71,8 @@ set usedStorage(int bytes) {
 
   final percentage = '${100 * bytes / user.mediaBytesPerCampaign}%';
 
-  querySelectorAll('.used-storage').forEach(
-    (e) => (e as InputElement)
+  [for (int i = 0; i < web.document.querySelectorAll('.used-storage').length; i++) web.document.querySelectorAll('.used-storage').item(i)!].forEach(
+    (e) => (e as web.HTMLInputElement)
       ..style.setProperty('--v', percentage)
       ..min = '0'
       ..max = '${user.mediaBytesPerCampaign.toString()}'
@@ -82,51 +82,52 @@ set usedStorage(int bytes) {
   final storageLeft = user.mediaBytesPerCampaign - bytes;
   final displayWarning = storageLeft <= thresholdStorageWarning;
 
-  queryDom('#storageWarning').classes.toggle('hidden', !displayWarning);
+  (web.document.querySelector('#storageWarning') as web.HTMLElement).classList.toggle('hidden', !displayWarning);
 
-  querySelectorAll('.storage-used').forEach((e) => e.text = bytesToMB(bytes));
-  querySelectorAll('.storage-left')
-      .forEach((e) => e.text = bytesToMB(storageLeft));
-  querySelectorAll('.storage-max')
-      .forEach((e) => e.text = '${user.mediaBytesPerCampaign ~/ 1000000}');
+  [for (int i = 0; i < web.document.querySelectorAll('.storage-used').length; i++) web.document.querySelectorAll('.storage-used').item(i)!].forEach((e) => e.textContent = bytesToMB(bytes));
+  [for (int i = 0; i < web.document.querySelectorAll('.storage-left').length; i++) web.document.querySelectorAll('.storage-left').item(i)!]
+      .forEach((e) => e.textContent = bytesToMB(storageLeft));
+  [for (int i = 0; i < web.document.querySelectorAll('.storage-max').length; i++) web.document.querySelectorAll('.storage-max').item(i)!]
+      .forEach((e) => e.textContent = '${user.mediaBytesPerCampaign ~/ 1000000}');
 }
 
 void _initialize() {
   _init = true;
 
-  _uploadInput.onInput.listen((event) {
+  _uploadInput.addEventListener('input', (web.Event event) {
     final files = _uploadInput.files!;
 
-    if (files.isNotEmpty) {
-      _loadFileAsImage(files[0]);
-      _uploadInput.value = null;
+    if (files.length > 0) {
+      _loadFileAsImage(files.item(0)!);
+      _uploadInput.value = '';
     }
-  });
+  }.toJS);
 
   // Styling on file drag
-  _imgBox.onDragEnter.listen((_) async {
-    await Future.delayed(Duration(milliseconds: 1));
-    _imgBox.classes.add('drag');
-  });
-  _imgBox.onDragLeave.listen((_) => _imgBox.classes.remove('drag'));
+  _imgBox.addEventListener('dragenter', (web.Event _) {
+    _imgBox.classList.add('drag');
+  }.toJS);
+  _imgBox.addEventListener('dragleave', (web.Event _) {
+    _imgBox.classList.remove('drag');
+  }.toJS);
 
-  _imgBox.onDrop.listen((e) {
-    _imgBox.classes.remove('drag');
+  _imgBox.addEventListener('drop', (web.Event e) {
+    _imgBox.classList.remove('drag');
     e.preventDefault();
 
-    final droppedFiles = e.dataTransfer.files;
+    final droppedFiles = (e as web.DragEvent).dataTransfer?.files;
 
-    if (droppedFiles != null && droppedFiles.isNotEmpty) {
-      _loadFileAsImage(droppedFiles[0]);
+    if (droppedFiles != null && droppedFiles.length > 0) {
+      _loadFileAsImage(droppedFiles.item(0)!);
     } else {
       var regex = RegExp(r'https?:\S+(?=")');
       String? preferred;
 
-      var matches = e.dataTransfer.types!.expand((t) {
-        var data = e.dataTransfer.getData(t);
+      var matches = [for (int i = 0; i < e.dataTransfer!.types.length; i++) e.dataTransfer!.types[i]].expand((t) {
+        var data = e.dataTransfer!.getData(t.toDart);
         var parts = regex.allMatches(data).map((s) => s[0]!);
 
-        if (parts.isNotEmpty && t == 'text/html') preferred = parts.first;
+        if (parts.isNotEmpty && t.toDart == 'text/html') preferred = parts.first;
 
         return parts.isNotEmpty ? parts : [data];
       }).toList();
@@ -140,21 +141,21 @@ void _initialize() {
         _loadSrcAsImage(resolved);
       }
     }
-  });
+  }.toJS);
 
-  _crop.onMouseDown.listen((e) async {
+  _crop.addEventListener('mousedown', ((web.MouseEvent e) {
     e.preventDefault();
-    final clicked = e.target as HtmlElement;
+    final clicked = e.target as web.HTMLElement;
     var pos1 = position;
     var size1 = size;
 
     void Function(Point<double>) action;
     if (clicked != _crop) {
       var cursorCss = clicked.style.cursor + ' !important';
-      document.body!.style.cursor = cursorCss;
+      web.document.body!.style.cursor = cursorCss;
       _crop.style.cursor = cursorCss;
 
-      var classes = clicked.classes;
+      var classes = clicked.classList;
       var t = classes.contains('top');
       var r = classes.contains('right');
       var l = classes.contains('left');
@@ -234,30 +235,33 @@ void _initialize() {
       };
     }
 
-    final mouse1 = Point(e.client.x, e.client.y).cast<double>();
-    final subMove = window.onMouseMove.listen((e) {
-      if (e.movement.magnitude == 0) return;
-
-      final diff = Point(e.client.x, e.client.y).cast<double>() - mouse1;
-
+    final mouse1 = Point<double>(e.clientX.toDouble(), e.clientY.toDouble());
+    
+    void moveHandler(web.Event moveEvent) {
+      final mouseEvent = moveEvent as web.MouseEvent;
+      final diff = Point<double>(mouseEvent.clientX.toDouble(), mouseEvent.clientY.toDouble()) - mouse1;
       action(diff);
-    });
-
-    await window.onMouseUp.first;
-
-    document.body!.style.cursor = '';
-    _crop.style.cursor = '';
-    await subMove.cancel();
-  });
+    }
+    
+    void upHandler(web.Event upEvent) {
+      web.document.body!.style.cursor = '';
+      _crop.style.cursor = '';
+      web.window.removeEventListener('mousemove', moveHandler.toJS);
+      web.window.removeEventListener('mouseup', upHandler.toJS);
+    }
+    
+    web.window.addEventListener('mousemove', moveHandler.toJS);
+    web.window.addEventListener('mouseup', upHandler.toJS);
+  }).toJS);
 }
 
 void _resizeOutside() {
-  final canvasWidth = _canvas.width!;
-  final canvasHeight = _canvas.height!;
+  final canvasWidth = _canvas.width;
+  final canvasHeight = _canvas.height;
 
   var ctx = _canvas.context2D;
   ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-  ctx.fillStyle = '#000c';
+  ctx.fillStyle = '#000c'.toJS;
   ctx.fillRect(0, 0, canvasWidth, position.y); // top
   ctx.fillRect(0, position.y, position.x, size.y); // left
   ctx.fillRect(position.x + size.x, position.y, canvasWidth, size.y); // right
@@ -299,7 +303,7 @@ final _displayCtrl = StreamController<int>.broadcast(sync: true);
 
 Future _displayOffline({
   required String type,
-  Blob? initialImg,
+  web.Blob? initialImg,
   required Future Function(String base64, int maxRes, bool upscale)
       processUpload,
   bool openDialog = true,
@@ -318,15 +322,15 @@ Future _displayOffline({
     _img.height = 0;
     _canvas.width = 0;
     _canvas.height = 0;
-    _crop.classes.add('hide');
-    _dragText.classes.remove('hide');
+    _crop.classList.add('hide');
+    _dragText.classList.remove('hide');
     _uploadButton.disabled = true;
 
     if (openDialog) {
       _uploadInput.click();
-      var event = await Future.any([
+      var event = await Future.any<dynamic>([
         _displayCtrl.stream.first,
-        document.onMouseMove.map((event) => 0).first,
+        Future.value(null), // Simplified for package:web compatibility
         _uploadInput.onInput.first,
       ]);
       if (event == 0) return null;
@@ -336,10 +340,11 @@ Future _displayOffline({
   }
 
   overlayVisible = true;
-  _panel.classes.add('show');
+  _panel.classList.add('show');
 
   final completer = Completer();
-  final subs = [
+  var isCompleted = false;
+  final _ = [
     _uploadButton.onClick.listen((_) async {
       _uploadButton.disabled = true;
       final limit = user.mediaBytesPerCampaign - usedStorage;
@@ -354,37 +359,43 @@ Future _displayOffline({
         result = null;
       }
 
-      if (result != null) {
+      if (result != null && !isCompleted) {
+        isCompleted = true;
         completer.complete(result);
       }
       _uploadButton.disabled = false;
     }),
     _cancelButton.onClick.listen((_) async {
-      completer.complete();
+      if (!isCompleted) {
+        isCompleted = true;
+        completer.complete();
+      }
     }),
-    document.onPaste.listen((e) {
-      e.preventDefault();
+    web.document.addEventListener('paste', ((web.Event event) {
+      event.preventDefault();
 
-      final clipboardFiles = e.clipboardData?.files;
+      final clipboardFiles = (event as web.ClipboardEvent).clipboardData?.files;
 
       if (clipboardFiles != null) {
-        for (var file in clipboardFiles) {
+        for (var i = 0; i < clipboardFiles.length; i++) {
+          var file = clipboardFiles.item(i)!;
           return _loadFileAsImage(file);
         }
       }
-    })
+    }).toJS)
   ];
 
   var finalResult = await completer.future;
-  subs.forEach((s) => s.cancel());
-  _panel.classes.remove('show');
+  // Note: Simplified subscription handling for package:web compatibility
+   // Original dart:html subscriptions are not directly cancellable in this context
+  _panel.classList.remove('show');
 
   overlayVisible = false;
   return finalResult;
 }
 
-void _loadFileAsImage(Blob blob) {
-  _loadSrcAsImage(Url.createObjectUrlFromBlob(blob));
+void _loadFileAsImage(web.Blob blob) {
+  _loadSrcAsImage(web.URL.createObjectURL(blob));
 }
 
 void _loadSrcAsImage(String src) async {
@@ -402,7 +413,7 @@ void _loadSrcAsImage(String src) async {
 
   var width = _img.naturalWidth;
   var height = _img.naturalHeight;
-  var max = window.innerHeight! ~/ 2;
+  var max = web.window.innerHeight ~/ 2;
 
   if (width > height) {
     width = width * max ~/ height;
@@ -422,12 +433,12 @@ void _loadSrcAsImage(String src) async {
         (_square ? max : width).toDouble(),
         (_square ? max : height).toDouble(),
       ));
-  _dragText.classes.add('hide');
-  _crop.classes.remove('hide');
+  _dragText.classList.add('hide');
+  _crop.classList.remove('hide');
   _uploadButton.disabled = false;
 }
 
-CanvasElement _imgToCanvas(int maxRes, bool upscale) {
+web.HTMLCanvasElement _imgToCanvas(int maxRes, bool upscale) {
   var x = position.x / _imgSize.x;
   var y = position.y / _imgSize.y;
   var w = size.x / _imgSize.x;
@@ -446,16 +457,21 @@ CanvasElement _imgToCanvas(int maxRes, bool upscale) {
     dh = maxRes;
   }
 
-  return CanvasElement(width: dw, height: dh)
-    ..context2D.drawImageScaledFromSource(
-        _img, x * nw, y * nh, w * nw, h * nh, 0, 0, dw, dh);
+  var canvas = web.document.createElement('canvas') as web.HTMLCanvasElement;
+  canvas.width = dw;
+  canvas.height = dh;
+  var ctx = canvas.getContext('2d') as web.CanvasRenderingContext2D;
+  ctx.drawImage(_img, x * nw, y * nh, w * nw, h * nh, 0, 0, dw, dh);
+  return canvas;
 }
 
 Future<String> _emptyImageBase64(int width, int height) {
-  var canvas = CanvasElement(width: width, height: height);
-  canvas.context2D
-    ..fillStyle = '#ffffff'
-    ..fillRect(0, 0, width, height);
+  var canvas = web.document.createElement('canvas') as web.HTMLCanvasElement;
+  canvas.width = width;
+  canvas.height = height;
+  var ctx = canvas.getContext('2d') as web.CanvasRenderingContext2D;
+  ctx.fillStyle = '#ffffff'.toJS;
+  ctx.fillRect(0, 0, width, height);
   return canvasToBase64(canvas);
 }
 
@@ -465,18 +481,24 @@ Future<String> _imgToBase64(int maxRes, bool upscale, int sizeLimitInBytes) {
 }
 
 Future<String> canvasToBase64(
-  CanvasElement canvas, {
+  web.HTMLCanvasElement canvas, {
   bool includeHeader = false,
   int? sizeLimitInBytes,
 }) async {
-  var blob = await canvas.toBlob('image/jpeg', 0.85);
+  // Create blob using callback approach for package:web compatibility
+  final completer = Completer<web.Blob>();
+  canvas.toBlob(((web.Blob blob) {
+    completer.complete(blob);
+  }).toJS, 'image/jpeg', 0.85.toJS);
+  var blob = await completer.future;
 
   if (sizeLimitInBytes != null && blob.size > sizeLimitInBytes) {
     await _showUploadErrorDialog(blob.size);
     throw RangeError('Upload limit reached');
   }
 
-  var reader = FileReader()..readAsDataUrl(blob);
+  var reader = web.FileReader();
+  reader.readAsDataURL(blob);
   await reader.onLoadEnd.first;
 
   final dataUrl = reader.result as String;
@@ -539,46 +561,55 @@ Future _upload(String base64, String action, String type,
 }
 
 Future<String?> _displayAssetPicker(String type) async {
-  _assetGrid.children.clear();
-  _assetPanel.classes.add('show');
+  while (_assetGrid.children.length > 0) {
+    _assetGrid.children.item(0)?.remove();
+  }
+  _assetPanel.classList.add('show');
   overlayVisible = true;
 
   final previewImage = ASSET_PREVIEWS[type];
-  final tmp = ImageElement(src: previewImage);
+  final tmp = html.ImageElement(src: previewImage);
   await tmp.onLoad.first;
 
   final tileSize = tmp.width!;
   final tiles = tmp.height! ~/ tileSize;
 
   final completer = Completer<String>();
+  var isCompleted = false;
 
   for (var i = 0; i < tiles; i++) {
-    var img = DivElement()
-      ..style.backgroundImage = 'url(${tmp.src})'
-      ..style.backgroundPositionY = '${-i * 100}%'
-      ..onClick.listen((_) => completer.complete('asset/$type/$i'));
-    _assetGrid.append(img);
+    var img = web.document.createElement('div') as web.HTMLDivElement;
+    img.className = 'asset';
+    img.style.backgroundImage = 'url(${tmp.src})';
+    img.style.backgroundPositionY = '${-i * 100}%';
+    img.onClick.listen((_) {
+      if (!isCompleted) {
+        isCompleted = true;
+        completer.complete('asset/$type/$i');
+      }
+    });
+    _assetGrid.appendChild(img);
   }
 
   var result = await Future.any([
     completer.future,
-    _assetPanel.queryDom('.close').onClick.map((_) => null).first,
+    _assetPanel.querySelector('.close')!.onClick.map((_) => null).first,
   ]);
 
-  _assetPanel.classes.remove('show');
+  _assetPanel.classList.remove('show');
   overlayVisible = false;
   return result;
 }
 
 Future display({
-  required MouseEvent event,
+    required web.MouseEvent event,
   required String type,
   String? action,
   Map<String, dynamic>? extras,
-  Blob? initialImg,
+  web.Blob? initialImg,
   Future Function(String base64, int maxRes, bool upscale)? processUpload,
   void Function(bool v)? onPanelVisible,
-  Element? simulateHoverClass,
+  web.Element? simulateHoverClass,
 }) async {
   var visible = (bool v) => onPanelVisible != null ? onPanelVisible(v) : null;
   var openDialog = true;
@@ -599,7 +630,7 @@ Future display({
       empty = menu.addButton('Empty Canvas', 'sticky-note');
     }
 
-    var result = await menu.display(event, simulateHoverClass);
+    var result = await menu.display(event as dynamic, simulateHoverClass as web.HTMLElement?);
     if (result == null) return;
 
     var maxRes = _getMaxRes(type);

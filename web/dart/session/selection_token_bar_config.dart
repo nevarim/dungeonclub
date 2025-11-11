@@ -1,11 +1,12 @@
-import 'dart:html';
+import 'dart:js_interop';
+import 'package:web/web.dart' as web;
 
 import 'package:dungeonclub/iterable_extension.dart';
 import 'package:dungeonclub/models/token_bar.dart';
 
 import '../html/color_palette.dart';
 import '../html/component.dart';
-import '../html/input_extension.dart';
+
 import '../html_helpers.dart';
 import 'movable.dart';
 import 'selection_token_bar.dart';
@@ -17,9 +18,9 @@ class TokenBarConfigPanel extends Component {
     TokenBarVisibility.HIDDEN,
   ];
 
-  final InputElement _labelInput = queryDom('#barConfigLabel');
-  final Element _visibilityRoot = queryDom('#barConfigVisibility');
-  final ButtonElement _removeButton = queryDom('#barRemoveButton');
+  final web.HTMLInputElement _labelInput = queryDom('#barConfigLabel');
+  final web.Element _visibilityRoot = queryDom('#barConfigVisibility');
+  final web.HTMLButtonElement _removeButton = queryDom('#barRemoveButton');
   late ColorPalette palette = ColorPalette(
     queryDom('#barConfigColor'),
     colors: TokenBar.colors,
@@ -32,25 +33,28 @@ class TokenBarConfigPanel extends Component {
     palette.onSelect.listen(_onSelectColor);
 
     for (var i = 0; i < _visibilityRoot.children.length; i++) {
-      final button = _visibilityRoot.children[i];
+      final button = _visibilityRoot.children.item(i)!;
 
-      button.onClick.listen((event) => _onClickSegmentedButton(i));
+      button.addEventListener('click', ((web.Event event) => _onClickSegmentedButton(i)).toJS);
     }
 
-    _labelInput.listenLazyUpdate(
-      onChange: (text) {
-        _modifySimilarTokenBars((token, bar) {
-          bar.label = _labelInput.value!;
-          token.getTokenBarComponent(bar).applyData();
-        });
+    _labelInput.addEventListener('input', ((web.Event _) {
+      _modifySimilarTokenBars((token, bar) {
+        bar.label = _labelInput.value;
+        token.getTokenBarComponent(bar).applyData();
+      });
+      _attachedBar!.applyDataToInputs();
+    }).toJS);
+    
+    _labelInput.addEventListener('keydown', ((web.Event event) {
+      final keyEvent = event as web.KeyboardEvent;
+      if (keyEvent.key == 'Enter') {
+        _attachedBar!.submitData();
+      }
+    }).toJS);
 
-        _attachedBar!.applyDataToInputs();
-      },
-      onSubmit: (_) => _attachedBar!.submitData(),
-    );
-
-    _removeButton.onClick.listen((_) {
-      _removeButton.classes.remove('hovered');
+    _removeButton.addEventListener('click', ((web.Event _) {
+      _removeButton.classList.remove('hovered');
       _modifySimilarTokenBars((token, bar) {
         token.bars.remove(bar);
         token.onRemoveTokenBar(bar);
@@ -59,7 +63,7 @@ class TokenBarConfigPanel extends Component {
       _attachedBar!
         ..token.board.selectedBars.remove(_attachedBar!)
         ..submitData();
-    });
+    }).toJS);
   }
 
   void _onSelectColor(String color) {
@@ -104,9 +108,23 @@ class TokenBarConfigPanel extends Component {
     _affectedBars = _findAffectedBars();
     _setDomVisible(true);
 
-    document.onMouseDown
-        .firstWhere((element) => !element.path.contains(htmlRoot))
-        .then((_) => _setDomVisible(false));
+    late web.EventListener mouseDownListener;
+    mouseDownListener = ((web.Event event) {
+      final mouseEvent = event as web.MouseEvent;
+      final path = mouseEvent.composedPath();
+      bool containsRoot = false;
+      for (int i = 0; i < path.length; i++) {
+        if (path[i] == htmlRoot as web.EventTarget) {
+          containsRoot = true;
+          break;
+        }
+      }
+      if (!containsRoot) {
+        _setDomVisible(false);
+        web.document.removeEventListener('mousedown', mouseDownListener);
+      }
+    }).toJS;
+    web.document.addEventListener('mousedown', mouseDownListener);
 
     _labelInput
       ..focus()
@@ -121,7 +139,7 @@ class TokenBarConfigPanel extends Component {
 
   void _setDomVisible(bool visible) {
     _attachedBar?.styleHighlight = visible;
-    htmlRoot.classes.toggle('show', visible);
+    htmlRoot.classList.toggle('show', visible);
   }
 
   void _onClickSegmentedButton(int index) {
@@ -139,8 +157,11 @@ class TokenBarConfigPanel extends Component {
 
   void _applyVisiblity(TokenBarVisibility visibility) {
     final buttonIndex = _visibilityButtonOrder.indexOf(visibility);
-    _visibilityRoot.querySelectorAll('.active').classes.remove('active');
+    final activeElements = _visibilityRoot.querySelectorAll('.active');
+    for (int i = 0; i < activeElements.length; i++) {
+      (activeElements.item(i)! as web.Element).classList.remove('active');
+    }
 
-    _visibilityRoot.children[buttonIndex].classes.add('active');
+    _visibilityRoot.children.item(buttonIndex)!.classList.add('active');
   }
 }

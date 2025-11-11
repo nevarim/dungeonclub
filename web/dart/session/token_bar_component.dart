@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:html';
+import 'package:web/web.dart' as web;
 
 import 'package:dungeonclub/models/token_bar.dart';
 
@@ -9,19 +9,19 @@ import 'movable.dart';
 class TokenBarComponent extends InstanceComponent {
   final Movable token;
   final TokenBar data;
-  late SpanElement _labelElement;
-  late SpanElement _valueElement;
+  late web.HTMLSpanElement _labelElement;
+  late web.HTMLSpanElement _valueElement;
 
   set _highlight(bool value) {
-    htmlRoot.classes.toggle('active', value);
+    htmlRoot.classList.toggle('active', value);
   }
 
-  TokenBarComponent(this.token, this.data) : super(LIElement()) {
+  TokenBarComponent(this.token, this.data) : super(web.document.createElement('li') as web.HTMLLIElement) {
     htmlRoot
       ..className = 'token-bar'
-      ..append(DivElement()..className = 'bar-fill')
-      ..append(_labelElement = SpanElement()..className = 'token-bar-label')
-      ..append(_valueElement = SpanElement()..className = 'token-bar-value');
+      ..appendChild(web.document.createElement('div')..className = 'bar-fill')
+      ..appendChild(_labelElement = web.document.createElement('span') as web.HTMLSpanElement..className = 'token-bar-label')
+      ..appendChild(_valueElement = web.document.createElement('span') as web.HTMLSpanElement..className = 'token-bar-value');
 
     applyData();
   }
@@ -58,9 +58,9 @@ class TokenBarComponent extends InstanceComponent {
       valueText = '${data.value} / ${data.maxValue}';
     }
 
-    htmlRoot.style.setProperty('--progress', '$progress');
-    htmlRoot.style.setProperty('--color', '${data.color}');
-    _labelElement.text = data.label;
-    _valueElement.text = valueText;
+    (htmlRoot as web.HTMLElement).style.setProperty('--progress', '$progress');
+    (htmlRoot as web.HTMLElement).style.setProperty('--color', '${data.color}');
+    _labelElement.textContent = data.label;
+    _valueElement.textContent = valueText;
   }
 }

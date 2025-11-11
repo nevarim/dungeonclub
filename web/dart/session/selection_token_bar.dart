@@ -1,5 +1,5 @@
-import 'dart:html';
-
+import 'dart:js_interop';
+import 'package:web/web.dart' as web;
 import 'package:dungeonclub/models/token_bar.dart';
 
 import '../html/input_extension.dart';
@@ -14,37 +14,48 @@ class SelectionTokenBar extends InstanceComponent {
   final Movable token;
   final TokenBar data;
 
-  late Element _clickableContainer;
-  late Element _iconElement;
-  late Element _labelElement;
-  late InputElement _valueInput;
-  late InputElement _maxInput;
+  late web.HTMLElement _clickableContainer;
+  late web.HTMLElement _iconElement;
+  late web.HTMLElement _labelElement;
+  late web.HTMLInputElement _valueInput;
+  late web.HTMLInputElement _maxInput;
 
   double _previousValue;
   double _previousMaxValue;
 
   set styleHighlight(bool value) {
-    htmlRoot.classes.toggle('highlight', value);
+    htmlRoot.classList.toggle('highlight', value);
   }
 
   SelectionTokenBar(this.token, this.data)
       : _previousValue = data.value,
         _previousMaxValue = data.maxValue,
-        super(LIElement()) {
-    htmlRoot
-      ..classes = ['list-setting']
-      ..append(_clickableContainer = SpanElement()
-        ..append(_iconElement = icon('lock'))
-        ..append(_labelElement = SpanElement()))
-      ..append(_valueInput = InputElement(type: 'number'))
-      ..append(SpanElement()..text = '/')
-      ..append(_maxInput = InputElement(type: 'number'));
+        super(web.document.createElement('li') as web.HTMLLIElement) {
+    htmlRoot.className = 'list-setting';
+    
+    _clickableContainer = web.document.createElement('span') as web.HTMLSpanElement;
+    _iconElement = icon('lock') as web.HTMLElement;
+    _labelElement = web.document.createElement('span') as web.HTMLSpanElement;
+    _clickableContainer.appendChild(_iconElement);
+    _clickableContainer.appendChild(_labelElement);
+    htmlRoot.appendChild(_clickableContainer);
+    
+    _valueInput = web.document.createElement('input') as web.HTMLInputElement;
+    _valueInput.type = 'number';
+    htmlRoot.appendChild(_valueInput);
+    
+    final separator = web.document.createElement('span') as web.HTMLSpanElement;
+    separator.textContent = '/';
+    htmlRoot.appendChild(separator);
+    
+    _maxInput = web.document.createElement('input') as web.HTMLInputElement;
+    _maxInput.type = 'number';
+    htmlRoot.appendChild(_maxInput);
 
-    _clickableContainer
-      ..classes = ['label', 'interactable']
-      ..onClick.listen((_) {
-        panel.attachTo(this);
-      });
+    _clickableContainer.className = 'label interactable';
+    _clickableContainer.addEventListener('click', (web.Event _) {
+      panel.attachTo(this);
+    }.toJS);
 
     _valueInput
       ..placeholder = 'Value...'
@@ -78,7 +89,7 @@ class SelectionTokenBar extends InstanceComponent {
       final hidden = data.visibility == TokenBarVisibility.HIDDEN;
 
       applyIconClasses(_iconElement, hidden ? 'user-slash' : 'user-lock');
-      _clickableContainer.children.insert(0, _iconElement);
+      _clickableContainer.insertBefore(_iconElement, _clickableContainer.firstChild);
     } else {
       _iconElement.remove();
     }
@@ -86,7 +97,7 @@ class SelectionTokenBar extends InstanceComponent {
 
   void applyDataToInputs() {
     applyVisibilityIcon();
-    _labelElement.text = data.label;
+    _labelElement.textContent = data.label;
     _valueInput.valueAsNumber = data.value;
     _maxInput.valueAsNumber = data.maxValue;
   }
@@ -102,8 +113,8 @@ class SelectionTokenBar extends InstanceComponent {
     final maxRaw = _maxInput.valueAsNumber;
 
     if (_isValidNumber(valueRaw) && _isValidNumber(maxRaw)) {
-      final value = valueRaw!.toDouble();
-      final max = maxRaw!.toDouble();
+      final value = valueRaw.toDouble();
+      final max = maxRaw.toDouble();
 
       final valueDiff = value - _previousValue;
       final maxDiff = max - _previousMaxValue;

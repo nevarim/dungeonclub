@@ -1,5 +1,6 @@
-import 'dart:html';
-
+import 'dart:html' as html;
+import 'dart:math';
+import 'package:web/web.dart' as web;
 import 'package:dungeonclub/actions.dart';
 import 'package:dungeonclub/iterable_extension.dart';
 import 'package:dungeonclub/models/entity_base.dart';
@@ -17,29 +18,29 @@ import 'character.dart';
 import 'movable.dart';
 import 'prefab.dart';
 
-final HtmlElement _palette = queryDom('#prefabPalette');
-final HtmlElement _pcPrefs = _palette.queryDom('#pcPrefabs');
-final HtmlElement _otherPrefs = _palette.queryDom('#otherPrefabs');
-final ButtonElement _addPref = _palette.queryDom('#addPrefab');
+final web.HTMLElement _palette = queryDom('#prefabPalette');
+final web.HTMLElement _pcPrefs = _palette.queryDom('#pcPrefabs');
+final web.HTMLElement _otherPrefs = _palette.queryDom('#otherPrefabs');
+final web.HTMLButtonElement _addPref = _palette.queryDom('#addPrefab');
 
-final HtmlElement _movableGhost = queryDom('#movableGhost');
+final web.HTMLElement _movableGhost = queryDom('#movableGhost');
 
-final HtmlElement _prefabProperties = queryDom('#prefabProperties');
+final web.HTMLElement _prefabProperties = queryDom('#prefabProperties');
 
-final HtmlElement _prefabImage = queryDom('#prefabImage');
-final ImageElement _prefabImageImg = _prefabImage.queryDom('img');
-final HtmlElement _prefabEmptyIcon = queryDom('#emptyIcon');
-final InputElement _prefabName = queryDom('#prefabName');
-final InputElement _prefabSize = queryDom('#prefabSize');
-final UListElement _prefabAccess = queryDom('#prefabAccess');
-final HtmlElement _prefabAccessSpan = queryDom('#prefabAccessSpan');
-final ButtonElement _prefabRemove = queryDom('#prefabRemove');
+final web.HTMLElement _prefabImage = queryDom('#prefabImage');
+final web.HTMLImageElement _prefabImageImg = _prefabImage.queryDom('img');
+final web.HTMLElement _prefabEmptyIcon = queryDom('#emptyIcon');
+final web.HTMLInputElement _prefabName = queryDom('#prefabName');
+final web.HTMLInputElement _prefabSize = queryDom('#prefabSize');
+final web.HTMLUListElement _prefabAccess = queryDom('#prefabAccess');
+final web.HTMLElement _prefabAccessSpan = queryDom('#prefabAccessSpan');
+final web.HTMLButtonElement _prefabRemove = queryDom('#prefabRemove');
 
 final pcPrefabs = InstanceList<CharacterPrefab>(_pcPrefs);
 final prefabs = InstanceList<CustomPrefab>(_otherPrefs);
 final emptyPrefab = EmptyPrefab();
 
-final Map<Character, LIElement> _accessEntries = {};
+final Map<Character, web.HTMLLIElement> _accessEntries = {};
 
 Prefab? _selectedPrefab;
 Prefab? get selectedPrefab => _selectedPrefab;
@@ -47,19 +48,22 @@ set selectedPrefab(Prefab? p) {
   if (!(user.session!.isDM)) return;
 
   _selectedPrefab = p;
-  _palette.querySelectorAll('.prefab.selected').classes.remove('selected');
-  p?.htmlRoot.classes.add('selected');
+  var selectedElements = _palette.querySelectorAll('.prefab.selected');
+  for (var i = 0; i < selectedElements.length; i++) {
+    (selectedElements.item(i) as web.HTMLElement).classList.remove('selected');
+  }
+  p?.htmlRoot.classList.add('selected');
 
-  _prefabProperties.classes.toggle('disabled', p == null);
+  _prefabProperties.classList.toggle('disabled', p == null);
 
   var isCustom = p is CustomPrefab;
   var isEmpty = p is EmptyPrefab;
 
-  _prefabAccess.classes.toggle('disabled', !isCustom);
+  _prefabAccess.classList.toggle('disabled', !isCustom);
   _updateAccessSpan();
 
   if (p != null) {
-    _prefabImage.classes.toggle('disabled', isEmpty);
+    _prefabImage.classList.toggle('disabled', isEmpty);
     _prefabName.disabled = isEmpty;
     _prefabRemove.disabled = !isCustom;
     _prefabSize.disabled = isEmpty;
@@ -71,11 +75,11 @@ set selectedPrefab(Prefab? p) {
     }
 
     _prefabName.value = p.name;
-    _prefabSize.valueAsNumber = p.size;
+    _prefabSize.valueAsNumber = p.size.toDouble();
 
     final img = p.image?.url ?? '';
     _prefabImageImg.src = img;
-    _movableGhost.classes.toggle('empty', isEmpty);
+    _movableGhost.classList.toggle('empty', isEmpty);
     _setMovableGhostImage(img);
     _movableGhost.style.setProperty('--size', '${p.size}');
     _movableGhost.style.setProperty('--angle', '0');
@@ -84,16 +88,16 @@ set selectedPrefab(Prefab? p) {
       var children = _prefabAccess.children;
       var ids = (selectedPrefab as CustomPrefab).accessIds;
       for (var i = 0; i < children.length; i++) {
-        children[i].classes.toggle('active', ids.contains(i));
+        (children.item(i) as web.HTMLElement).classList.toggle('active', ids.contains(i));
       }
     }
   }
   toggleMovableGhostVisible(false);
 }
 
-bool get collapsed => _palette.classes.contains('collapsed');
+bool get collapsed => _palette.classList.contains('collapsed');
 set collapsed(bool collapsed) {
-  _palette.classes.toggle('collapsed', collapsed);
+  _palette.classList.toggle('collapsed', collapsed);
   queryDom('#paletteCollapse > i').className =
       'fas fa-chevron-' + (collapsed ? 'down' : 'up');
 }
@@ -102,13 +106,13 @@ void toggleMovableGhostVisible(bool v, {bool translucent = false}) {
   if (v == _movableGhost.isConnected) return;
   if (v) {
     user.session!.board.grid.e
-        .append(_movableGhost..classes.toggle('translucent', translucent));
+        .append(_movableGhost..classList.toggle('translucent', translucent));
   } else {
     _movableGhost.remove();
   }
 }
 
-void alignMovableGhost(Point point, EntityBase entity) {
+void alignMovableGhost(Point<num> point, EntityBase entity) {
   final grid = user.session!.board.grid;
   final p = grid.centeredWorldPoint(point, entity.size);
 
@@ -119,9 +123,9 @@ void alignMovableGhost(Point point, EntityBase entity) {
 void _updateAccessSpan() {
   if (selectedPrefab is CustomPrefab) {
     var count = (selectedPrefab as CustomPrefab).accessIds.length;
-    _prefabAccessSpan.text = 'Access ($count selected)';
+    _prefabAccessSpan.textContent = 'Access ($count selected)';
   } else {
-    _prefabAccessSpan.text = '';
+    _prefabAccessSpan.textContent = '';
   }
 }
 
@@ -140,7 +144,7 @@ void _initPrefabPalette() {
     pcPrefabs.add(pc.prefab);
   }
 
-  _otherPrefs.parent!.nodes.insert(1, emptyPrefab.htmlRoot);
+  _otherPrefs.parentElement!.insertBefore(emptyPrefab.htmlRoot, _otherPrefs.nextElementSibling);
 
   _addPref.onLMB.listen(createPrefab);
   _palette.queryDom('#paletteCollapse').onClick.listen((_) {
@@ -156,25 +160,25 @@ void imitateMovableGhost(Movable m) {
     ..setProperty('--size', '${m.displaySize}')
     ..setProperty('--angle', '${m.angle}');
 
-  _movableGhost.classes.toggle('empty', m is EmptyMovable);
+  _movableGhost.classList.toggle('empty', m is EmptyMovable);
 
   final img = m.prefab.image?.url;
   _setMovableGhostImage(img);
 }
 
 void _setMovableGhostImage(String? img) {
-  _movableGhost.queryDom('.img').style.backgroundImage =
+  (_movableGhost.queryDom('.img') as web.HTMLElement).style.backgroundImage =
       img == null ? '' : 'url($img)';
 }
 
 void applyCharacterNameToAccessEntry(Character character) {
-  _accessEntries[character]?.text = character.name;
+  _accessEntries[character]?.textContent = character.name;
 }
 
 void _initPrefabProperties() {
   registerEditImage(
     _prefabImage,
-    upload: (MouseEvent ev, [Blob? initialFile]) async {
+    upload: (web.MouseEvent ev, [web.Blob? initialFile]) async {
       final uploadType = (selectedPrefab is CharacterPrefab)
           ? IMAGE_TYPE_PC
           : IMAGE_TYPE_ENTITY;
@@ -202,18 +206,18 @@ void _initPrefabProperties() {
   );
 
   _listenLazyUpdate(_prefabName, onChange: (pref, input) {
-    (pref as ChangeableName).name = input.value!;
+    (pref as ChangeableName).name = input.value;
   });
   _listenLazyUpdate(_prefabSize, onChange: (pref, input) {
-    pref.size = input.valueAsNumber!.toInt();
+    pref.size = (input.valueAsNumber ?? 0).toInt();
     _movableGhost.style.setProperty('--size', '${pref.size}');
   });
 
   for (var ch in user.session!.characters) {
-    final li = LIElement();
-    li.text = ch.name;
+    final li = web.document.createElement('li') as web.HTMLLIElement;
+    li.textContent = ch.name;
     li.onClick.listen((_) {
-      var active = li.classes.toggle('active');
+      var active = li.classList.toggle('active');
       var ids = (selectedPrefab as CustomPrefab).accessIds;
       if (active) {
         ids.add(ch.id);
@@ -248,8 +252,8 @@ void _initPrefabProperties() {
 }
 
 void _listenLazyUpdate(
-  InputElement input, {
-  required void Function(Prefab prefab, InputElement self) onChange,
+  web.HTMLInputElement input, {
+  required void Function(Prefab prefab, web.HTMLInputElement self) onChange,
 }) {
   var bufferedValue = input.value;
 
@@ -275,7 +279,7 @@ void _sendUpdate() {
 void _updateAddButton() {
   var limitReached = prefabs.length >= user.prefabsPerCampaign;
   _addPref.disabled = limitReached;
-  _addPref.queryDom('span').text = limitReached ? 'Limit Reached' : 'Add Token';
+  _addPref.queryDom('span').textContent = limitReached ? 'Limit Reached' : 'Add Token';
 }
 
 void _displayLimitMsg() {
@@ -283,7 +287,7 @@ void _displayLimitMsg() {
       .display();
 }
 
-Future<void> createPrefab(MouseEvent ev) async {
+Future<void> createPrefab(web.MouseEvent ev) async {
   if (prefabs.length >= user.prefabsPerCampaign) return _displayLimitMsg();
 
   var fallbackID = prefabs.getNextAvailableID((e) => e.idNum);

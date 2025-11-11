@@ -1,5 +1,6 @@
-import 'dart:html';
+import 'dart:js_interop';
 import 'dart:math';
+import 'package:web/web.dart' as web;
 
 import 'package:dungeonclub/models/entity_base.dart';
 
@@ -25,7 +26,7 @@ mixin ClampedEntityBase on EntityBase {
 
 abstract class Prefab extends InstanceComponent
     with EntityBase, ClampedEntityBase {
-  final SpanElement _nameSpan;
+  final web.HTMLSpanElement _nameSpan;
   final Resource? image;
 
   @override
@@ -44,18 +45,18 @@ abstract class Prefab extends InstanceComponent
   int get minSize => 1;
 
   Prefab(this.image)
-      : _nameSpan = SpanElement(),
-        super(DivElement()) {
-    htmlRoot
+      : _nameSpan = web.document.createElement('span') as web.HTMLSpanElement,
+        super(web.document.createElement('div') as web.HTMLDivElement) {
+    (htmlRoot as web.HTMLElement)
       ..className = 'prefab'
-      ..onClick.listen((_) {
+      ..addEventListener('click', ((web.Event _) {
         if (selectedPrefab == this) {
           selectedPrefab = null;
         } else {
           selectedPrefab = this;
         }
-      })
-      ..append(_nameSpan);
+      }).toJS)
+      ..appendChild(_nameSpan);
   }
 
   void applyImage() {
@@ -63,13 +64,13 @@ abstract class Prefab extends InstanceComponent
       final src = image!.url;
 
       if (user.session!.isDM) {
-        htmlRoot.style.backgroundImage = 'url($src)';
+        (htmlRoot as web.HTMLElement).style.setProperty('background-image', 'url($src)');
       }
     }
   }
 
   void applyName() {
-    _nameSpan.text = name;
+    _nameSpan.textContent = name;
   }
 }
 

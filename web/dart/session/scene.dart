@@ -1,4 +1,4 @@
-import 'dart:html';
+import 'package:web/web.dart' as web;
 
 import 'package:dungeonclub/actions.dart';
 
@@ -8,36 +8,40 @@ import '../html_helpers.dart';
 import '../panels/upload.dart' as upload;
 import '../resource.dart';
 
-final HtmlElement _scenesContainer = queryDom('#scenes');
-final ButtonElement _addScene = _scenesContainer.queryDom('#addScene')
-  ..onLMB.listen((ev) async {
-    var json = await upload.display(
-      event: ev,
-      action: GAME_SCENE_ADD,
-      type: IMAGE_TYPE_SCENE,
-      simulateHoverClass: queryDom('#sceneSelector'),
-    );
+final web.HTMLElement _scenesContainer = queryDom('#scenes') as web.HTMLElement;
+final web.HTMLButtonElement _addScene = queryDom('#addScene') as web.HTMLButtonElement;
 
-    if (json != null) {
-      final session = user.session!;
-      if (session.scenes.length == 1) {
-        session.scenes.first.enableRemove = true;
-      }
+void _handleAddSceneClick(web.Event ev) async {
+  var json = await upload.display(
+    event: ev as dynamic,
+    action: GAME_SCENE_ADD,
+    type: IMAGE_TYPE_SCENE,
+    simulateHoverClass: queryDom('#sceneSelector'),
+  );
 
-      final resource = Resource(json['image']);
-      final scene = Scene(json['id'], resource);
-      session.scenes.add(scene);
-      Scene.updateAddSceneButton();
-      await scene.enterEdit(json);
+  if (json != null) {
+    final session = user.session!;
+    if (session.scenes.length == 1) {
+      session.scenes.first.enableRemove = true;
     }
-  });
+
+    final resource = Resource(json['image']);
+    final scene = Scene(json['id'], resource);
+    session.scenes.add(scene);
+    Scene.updateAddSceneButton();
+    await scene.enterEdit(json);
+  }
+}
+
+// Initialize the add scene button event listener
+final _ = _addScene.addEventListener('mousedown', _handleAddSceneClick as web.EventListener);
 
 class Scene {
-  final HtmlElement e;
+  final web.HTMLElement e;
   final Resource background;
   final int id;
-  late HtmlElement _bg;
-  late ButtonElement _remove;
+  late web.HTMLElement _bg;
+  late web.HTMLButtonElement _remove;
 
   bool get isPlaying => user.session!.playingScene == this;
   bool get isEditing => user.session!.board.refScene == this;
@@ -45,18 +49,31 @@ class Scene {
   set enableRemove(bool enable) => _remove.disabled = !enable;
 
   Scene(this.id, this.background)
-      : e = DivElement()..className = 'scene-preview' {
+      : e = web.document.createElement('div') as web.HTMLElement..className = 'scene-preview' {
     e
-      ..append(_bg = DivElement()
-        ..append(iconButton('wrench', label: 'Edit')
-          ..onClick.listen((_) => enterEdit())))
-      ..append(SpanElement()
-        ..append(iconButton('play', className: 'play', label: 'Play')
-          ..onClick.listen((_) => enterPlay()))
-        ..append(_remove = iconButton('trash', className: 'bad')
-          ..onClick.listen((_) => sendRemove())));
+      ..append(_bg = web.document.createElement('div') as web.HTMLElement)
+      ..append(web.document.createElement('span') as web.HTMLElement);
+    
+    final editButton = iconButton('wrench', label: 'Edit');
+     (editButton as dynamic).addEventListener('click', (web.Event _) {
+       enterEdit();
+     });
+     _bg.append(editButton as web.Node);
+     
+     final spanElement = e.children.item(1) as web.HTMLElement;
+     final playButton = iconButton('play', className: 'play', label: 'Play');
+     (playButton as dynamic).addEventListener('click', (web.Event _) {
+       enterPlay();
+     });
+     spanElement.append(playButton as web.Node);
+     
+     _remove = iconButton('trash', className: 'bad');
+     (_remove as dynamic).addEventListener('click', (web.Event _) {
+       sendRemove();
+     });
+     spanElement.append(_remove);
     applyBackground();
-    _scenesContainer.insertBefore(e, _addScene);
+    _scenesContainer.insertBefore(e as web.Node, _addScene as web.Node);
   }
 
   Scene.fromJson(Map<String, dynamic> json)
@@ -68,8 +85,8 @@ class Scene {
   }
 
   void applyEditPlayState() {
-    _bg.classes.toggle('playing', isPlaying);
-    _bg.classes.toggle('editing', isEditing);
+    _bg.classList.toggle('playing', isPlaying);
+    _bg.classList.toggle('editing', isEditing);
   }
 
   void sendRemove() {

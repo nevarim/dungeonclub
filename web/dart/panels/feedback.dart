@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'dart:html';
+import 'dart:js_interop';
+import 'package:web/web.dart' as web;
 
 import 'package:dungeonclub/actions.dart';
 
@@ -8,17 +9,20 @@ import '../communication.dart';
 import '../html_helpers.dart';
 import 'panel_overlay.dart';
 
-final HtmlElement _panel = queryDom('#feedbackPanel');
-final SelectElement _select = _panel.queryDom('select');
-final TextAreaElement _content = _panel.queryDom('textarea')
-  ..onInput.listen((_) => _updateSendButton());
-final ButtonElement _cancelButton = _panel.queryDom('button.close');
-final ButtonElement _sendButton = _panel.queryDom('#sendFeedback');
+final web.HTMLElement _panel = queryDom('#feedbackPanel') as web.HTMLElement;
+final web.HTMLSelectElement _select = _panel.querySelector('select') as web.HTMLSelectElement;
+final web.HTMLTextAreaElement _content = _panel.querySelector('textarea') as web.HTMLTextAreaElement;
+final web.HTMLButtonElement _cancelButton = _panel.querySelector('button.close') as web.HTMLButtonElement;
+final web.HTMLButtonElement _sendButton = _panel.querySelector('#sendFeedback') as web.HTMLButtonElement;
 
 Future<void> display() async {
   overlayVisible = true;
 
-  for (var opt in _select.options) {
+  // Set up content input listener
+  _content.addEventListener('input', ((web.Event _) => _updateSendButton()).toJS);
+
+  for (int i = 0; i < _select.options.length; i++) {
+    final opt = _select.options.item(i) as web.HTMLOptionElement;
     if (opt.value == 'account') opt.disabled = !user.registered;
   }
 
@@ -26,20 +30,39 @@ Future<void> display() async {
   _updateSendButton();
 
   var closer = Completer();
-  var subs = [
-    _sendButton.onClick.listen((_) async {
-      _cancelButton.disabled = true;
-      if (await _trySend()) closer.complete();
-      _cancelButton.disabled = false;
-    }),
-    _cancelButton.onClick.listen((_) => closer.complete()),
-  ];
+  bool isCompleted = false;
+  
+  void sendHandler(web.Event event) async {
+    event.preventDefault();
+    _cancelButton.disabled = true;
+    if (await _trySend()) {
+      if (!isCompleted) {
+        isCompleted = true;
+        closer.complete();
+      }
+    }
+    _cancelButton.disabled = false;
+  }
+  
+  void cancelHandler(web.Event event) {
+    event.preventDefault();
+    if (!isCompleted) {
+      isCompleted = true;
+      closer.complete();
+    }
+  }
+  
+  _sendButton.addEventListener('click', sendHandler.toJS);
+  _cancelButton.addEventListener('click', cancelHandler.toJS);
 
-  _panel.classes.add('show');
+  _panel.classList.add('show');
 
   await closer.future;
-  _panel.classes.remove('show');
-  subs.forEach((s) => s.cancel());
+  _panel.classList.remove('show');
+  
+  _sendButton.removeEventListener('click', sendHandler.toJS);
+  _cancelButton.removeEventListener('click', cancelHandler.toJS);
+  
   overlayVisible = false;
 }
 
@@ -61,5 +84,5 @@ Future<bool> _trySend() async {
 }
 
 void _updateSendButton() {
-  _sendButton.disabled = _content.value!.length < 20;
+  _sendButton.disabled = _content.value.length < 20;
 }

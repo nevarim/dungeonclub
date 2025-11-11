@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:html';
+import 'package:web/web.dart' as web;
 
 import 'package:dungeonclub/actions.dart';
 
@@ -47,13 +47,16 @@ class User {
 
   void _onSessionJoin(bool instantEdit, [Map<String, dynamic>? s]) {
     if (s != null) _session!.fromJson(s, instantEdit: instantEdit);
-
     showPage('session');
     home.iconWall.stop();
 
     Future.delayed(Duration(seconds: 1), () {
-      for (var vid in querySelectorAll('#home video')) {
-        vid.remove();
+      var videos = web.document.querySelectorAll('#home video');
+      for (var i = 0; i < videos.length; i++) {
+        var vid = videos.item(i);
+        if (vid != null) {
+          vid.parentNode?.removeChild(vid);
+        }
       }
     });
   }
@@ -76,7 +79,7 @@ class User {
     var now = DateTime.now().millisecondsSinceEpoch;
     await Future.delayed(Duration(milliseconds: timestamp - now + 3000));
 
-    window.location.href = homeUrl;
+    web.window.location.href = homeUrl;
   }
 
   void onActivate(Map<String, dynamic> accJson) {

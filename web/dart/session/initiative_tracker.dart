@@ -1,6 +1,8 @@
 import 'dart:async';
-import 'dart:html';
+
+import 'dart:js_interop';
 import 'dart:math';
+import 'package:web/web.dart' as web;
 
 import 'package:dungeonclub/actions.dart';
 import 'package:dungeonclub/models/entity_base.dart';
@@ -10,13 +12,13 @@ import '../communication.dart';
 import '../html_helpers.dart';
 import '../panels/context_menu.dart';
 import '../panels/panel_overlay.dart';
-import '../panels/upload.dart';
+
 import 'movable.dart';
 import 'prefab.dart';
 
-HtmlElement get initiativeBar => queryDom('#initiativeBar');
-HtmlElement get charContainer => initiativeBar.queryDom('.roster');
-ButtonElement get rerollButton => queryDom('#initiativeReroll');
+web.HTMLElement get initiativeBar => queryDom('#initiativeBar');
+web.HTMLElement get charContainer => initiativeBar.queryDom('.roster');
+web.HTMLButtonElement get rerollButton => queryDom('#initiativeReroll');
 InitiativeSummary? _summary;
 
 class InitiativeTracker {
@@ -25,21 +27,22 @@ class InitiativeTracker {
   Timer? _diceAnim;
   Iterable<Movable>? _similar;
 
-  ButtonElement get callRollsButton => queryDom('#initiativeTracker');
-  SpanElement get initiativeDice => queryDom('#initiativeDice');
-  SpanElement get targetText => queryDom('#initiativeTarget');
-  ButtonElement get userRollButton => queryDom('#initiativeRoll');
-  ButtonElement get skipButton => queryDom('#initiativeSkip');
-  ButtonElement get skipTypeButton => queryDom('#initiativeSkipType');
-  HtmlElement get panel => queryDom('#initiativePanel');
+  web.HTMLButtonElement get callRollsButton => queryDom('#initiativeTracker');
+  web.HTMLSpanElement get initiativeDice => queryDom('#initiativeDice');
+  web.HTMLSpanElement get targetText => queryDom('#initiativeTarget');
+  web.HTMLButtonElement get userRollButton => queryDom('#initiativeRoll');
+  web.HTMLButtonElement get skipButton => queryDom('#initiativeSkip');
+  web.HTMLButtonElement get skipTypeButton => queryDom('#initiativeSkipType');
+  web.HTMLElement get panel => queryDom('#initiativePanel');
 
-  bool get rollerPanelVisible => panel.classes.contains('show');
-  set showBar(bool v) => initiativeBar.classes.toggle('hidden', !v);
+  bool get rollerPanelVisible => panel.classList.contains('show');
+  set showBar(bool v) => initiativeBar.classList.toggle('hidden', !v);
   set disabled(bool disabled) => callRollsButton.disabled = disabled;
 
   void init(bool isDM) {
-    callRollsButton.onClick.listen((_) {
-      var trackerActive = callRollsButton.classes.toggle('active');
+    callRollsButton.addEventListener('click', (web.Event _) {
+      callRollsButton.classList.toggle('active');
+      var trackerActive = callRollsButton.classList.contains('active');
 
       if (trackerActive) {
         sendRollForInitiative();
@@ -50,21 +53,27 @@ class InitiativeTracker {
         }
         socket.sendAction(GAME_CLEAR_INITIATIVE);
       }
-    });
+    }.toJS);
 
-    userRollButton.onClick.listen((_) => rollDice());
-    skipButton.classes.toggle('hidden', !isDM);
-    skipTypeButton.onClick.listen((_) => _skipAllOfType());
+    userRollButton.addEventListener('click', (web.Event _) {
+      rollDice();
+    }.toJS);
+    skipButton.classList.toggle('hidden', !isDM);
+    skipTypeButton.addEventListener('click', (web.Event _) {
+      _skipAllOfType();
+    }.toJS);
     if (isDM) {
-      skipButton.onClick.listen((_) {
+      skipButton.addEventListener('click', (web.Event _) {
         _summary!.mine.removeAt(0);
         nextRoll();
-      });
-      rerollButton.onClick.listen((_) => sendReroll());
-      panel.queryDom('.close').onClick.listen((_) {
+      }.toJS);
+      rerollButton.addEventListener('click', (web.Event _) {
+        sendReroll();
+      }.toJS);
+      panel.queryDom('.close').addEventListener('click', (web.Event _) {
         _summary!.mine.clear();
         nextRoll();
-      });
+      }.toJS);
     }
   }
 
@@ -84,7 +93,7 @@ class InitiativeTracker {
   void rollDice() {
     _diceAnim?.cancel();
     var r = rng.nextInt(20) + 1;
-    initiativeDice.text = '$r';
+    initiativeDice.textContent = '$r';
 
     var movable = _summary!.mine.removeAt(0);
     var prefab = movable.prefab;
@@ -134,7 +143,8 @@ class InitiativeTracker {
 
   void nextRoll() {
     if (_summary!.mine.isEmpty) {
-      if (panel.classes.remove('show')) overlayVisible = false;
+      panel.classList.remove('show');
+      overlayVisible = false;
       return;
     }
 
@@ -148,7 +158,7 @@ class InitiativeTracker {
       } while (r == roll);
 
       roll = r;
-      initiativeDice.text = '$r';
+      initiativeDice.textContent = '$r';
     });
 
     var mv = _summary!.mine.first;
@@ -161,12 +171,13 @@ class InitiativeTracker {
     });
 
     var name = mv.displayName;
-    targetText.innerHtml = "<b>$name</b>'s Initiative";
+    targetText.innerHTML = "<b>$name</b>'s Initiative".toJS;
 
-    skipTypeButton.text = 'Skip ${_similar!.length} Similar Tokens';
-    skipTypeButton.classes.toggle('hidden', _similar!.length < 2);
+    skipTypeButton.textContent = 'Skip ${_similar!.length} Similar Tokens';
+    skipTypeButton.classList.toggle('hidden', _similar!.length < 2);
 
-    if (panel.classes.add('show')) overlayVisible = true;
+    panel.classList.add('show');
+    overlayVisible = true;
     _disableButtons(false);
   }
 
@@ -187,14 +198,15 @@ class InitiativeTracker {
     _summary?.entries.forEach((entry) => entry.e.remove());
     _summary = null;
     updateRerollableInitiatives();
-    if (panel.classes.remove('show')) overlayVisible = false;
+    panel.classList.remove('show');
+    overlayVisible = false;
   }
 
   void onNameUpdate(Movable m) {
     if (_summary != null) {
       for (var entry in _summary!.entries) {
         if (entry.movable == m) {
-          entry.nameText.text = m.displayName;
+          entry.nameText.textContent = m.displayName;
           return;
         }
       }
@@ -249,7 +261,7 @@ class InitiativeTracker {
   }
 
   void fromJson(Iterable? jList) {
-    callRollsButton.classes.toggle('active', jList != null);
+    callRollsButton.classList.toggle('active', jList != null);
     outOfCombat();
     if (jList != null) {
       resetBar();
@@ -338,7 +350,7 @@ class InitiativeSummary {
     if (mod != null) entry.modifier = mod;
 
     entries.add(entry);
-    charContainer.append(entry.e);
+    charContainer.appendChild(entry.e);
     sort();
     updateRerollableInitiatives();
   }
@@ -357,23 +369,23 @@ class InitiativeSummary {
         }
       }
     }
-    charContainer.append(rerollButton);
+    charContainer.appendChild(rerollButton);
   }
 }
 
 class InitiativeEntry {
-  final e = DivElement();
-  final modText = SpanElement();
-  final totalText = SpanElement();
-  final nameText = SpanElement()..className = 'compact';
-  final imageElement = DivElement();
+  final e = web.document.createElement('div') as web.HTMLDivElement;
+  final modText = web.document.createElement('span') as web.HTMLSpanElement;
+  final totalText = web.document.createElement('span') as web.HTMLSpanElement;
+  final nameText = web.document.createElement('span') as web.HTMLSpanElement;
+  final imageElement = web.document.createElement('div') as web.HTMLDivElement;
   final Movable movable;
   final int base;
 
-  bool get dmOnly => e.classes.contains('private');
+  bool get dmOnly => e.classList.contains('private');
   set dmOnly(bool dmOnly) {
     if (user.session!.isDM) {
-      e.classes.toggle('private', dmOnly);
+      e.classList.toggle('private', dmOnly);
     }
   }
 
@@ -383,8 +395,8 @@ class InitiativeEntry {
   int get modifier => _modifier;
   set modifier(int modifier) {
     _modifier = modifier;
-    modText.text = (modifier >= 0 ? '+$modifier' : '$modifier');
-    totalText.text = '$total';
+    modText.textContent = (modifier >= 0 ? '+$modifier' : '$modifier');
+    totalText.textContent = '$total';
 
     var pref = movable.prefab;
     if (pref is HasInitiativeMod) {
@@ -396,29 +408,46 @@ class InitiativeEntry {
     int? _bufferedModifier;
     applyImage();
 
-    e
-      ..className = 'char'
-      ..append(SpanElement()
-        ..className = 'step-input'
-        ..append(icon('minus')..onClick.listen((_) => modifier--))
-        ..append(modText)
-        ..append(icon('plus')..onClick.listen((_) => modifier++)))
-      ..append(imageElement
-        ..append(totalText)
-        ..onLMB.listen(_onClick)
-        ..onContextMenu.listen(_onClick))
-      ..append(nameText..text = movable.displayName)
-      ..onMouseEnter.listen((_) {
-        movable.styleHovered = true;
-        _bufferedModifier = modifier;
-      })
-      ..onMouseLeave.listen((_) {
-        movable.styleHovered = false;
-        if (modifier != _bufferedModifier) {
-          _summary!.sort();
-          sendUpdate();
-        }
-      });
+    nameText.className = 'compact';
+    nameText.textContent = movable.displayName;
+
+    final stepInput = web.document.createElement('span') as web.HTMLSpanElement;
+    stepInput.className = 'step-input';
+    
+    final minusIcon = icon('minus');
+    minusIcon.addEventListener('click', (web.Event _) {
+      modifier--;
+    }.toJS);
+    stepInput.appendChild(minusIcon);
+    stepInput.appendChild(modText);
+    
+    final plusIcon = icon('plus');
+    plusIcon.addEventListener('click', (web.Event _) {
+      modifier++;
+    }.toJS);
+    stepInput.appendChild(plusIcon);
+
+    imageElement.appendChild(totalText);
+    imageElement.addEventListener('mousedown', ((web.Event e) => _onClick(e as web.MouseEvent)).toJS);
+    imageElement.addEventListener('contextmenu', ((web.Event e) => _onClick(e as web.MouseEvent)).toJS);
+
+    e.className = 'char';
+    e.appendChild(stepInput);
+    e.appendChild(imageElement);
+    e.appendChild(nameText);
+    
+    e.addEventListener('mouseenter', (web.Event _) {
+      movable.styleHovered = true;
+      _bufferedModifier = modifier;
+    }.toJS);
+    
+    e.addEventListener('mouseleave', (web.Event _) {
+      movable.styleHovered = false;
+      if (modifier != _bufferedModifier) {
+        _summary!.sort();
+        sendUpdate();
+      }
+    }.toJS);
 
     this.dmOnly = dmOnly;
     var pref = movable.prefab;
@@ -434,7 +463,7 @@ class InitiativeEntry {
     imageElement.style.backgroundImage = 'url($img)';
   }
 
-  void _onClick(MouseEvent ev) async {
+  void _onClick(web.MouseEvent ev) async {
     ev.preventDefault();
 
     final menu = ContextMenu();

@@ -1,11 +1,12 @@
 import 'dart:async';
-import 'dart:html';
+import 'dart:js_interop';
+import 'dart:typed_data';
+import 'package:web/web.dart' as web;
 
 import 'package:dungeonclub/actions.dart';
 import 'package:dungeonclub/comms.dart';
 import 'package:dungeonclub/environment.dart';
 import 'package:path/path.dart';
-import 'package:web_whiteboard/communication/web_socket.dart';
 
 import '../main.dart';
 import 'action_handler.dart' as handler;
@@ -13,17 +14,26 @@ import 'html_helpers.dart';
 import 'panels/dialog.dart';
 import 'session/measuring.dart';
 
+/// Converts a web.Blob to Uint8List
+Future<Uint8List> blobToBytes(web.Blob blob) async {
+  final reader = web.FileReader();
+  reader.readAsArrayBuffer(blob);
+  await reader.onLoadEnd.first;
+  final result = reader.result as JSArrayBuffer;
+  return result.toDart.asUint8List();
+}
+
 final String _serverAddress = _getServerAddress();
 
 final socket = FrontSocket();
 
 bool get isDebugging {
-  final webPort = window.location.port;
+  final webPort = web.window.location.port;
   return !Environment.isCompiled && webPort == '8080';
 }
 
 String _getServerAddress() {
-  final address = window.location.origin;
+  final address = web.window.location.origin;
 
   if (isDebugging) {
     // Replace address port 8080 with default server port 7070
@@ -44,7 +54,7 @@ const demoActions = [
 ];
 
 class FrontSocket extends Socket {
-  WebSocket? _webSocket;
+  web.WebSocket? _webSocket;
   final _waitForOpen = Completer();
   Timer? _retryTimer;
   ConstantDialog? _errorDialog;
@@ -59,16 +69,16 @@ class FrontSocket extends Socket {
 
   void connect({bool goHome = true}) {
     _retryTimer?.cancel();
-    _webSocket = WebSocket(getFile('ws').replaceFirst('http', 'ws'))
-      ..onOpen.listen((e) {
+    _webSocket = web.WebSocket(getFile('ws').replaceFirst('http', 'ws'))
+      ..addEventListener('open', ((web.Event e) {
         if (_errorDialog != null) {
-          window.location.href = goHome ? homeUrl : window.location.href;
+          web.window.location.href = goHome ? homeUrl : web.window.location.href;
         } else {
           _waitForOpen.complete();
         }
-      })
-      ..onClose.listen((e) => _handleConnectionClose())
-      ..onError.listen((e) => _handleConnectionError());
+      }).toJS)
+      ..addEventListener('close', ((web.Event e) => _handleConnectionClose()).toJS)
+      ..addEventListener('error', ((web.Event e) => _handleConnectionError()).toJS);
 
     listen();
   }
@@ -84,7 +94,7 @@ class FrontSocket extends Socket {
     _errorDialog ??= ConstantDialog('Connection Error')
       ..addParagraph('Your connection to the server was closed unexpectedly.')
       ..addParagraph('Reconnecting...')
-      ..append(icon('spinner')..classes.add('spinner'))
+      ..append(icon('spinner')..classList.add('spinner'))
       ..display();
 
     _retryTimer = Timer(Duration(seconds: 1), () => connect(goHome: false));
@@ -93,7 +103,7 @@ class FrontSocket extends Socket {
   void _handleConnectionError() async {
     if (_manualClose) return;
 
-    document.title = 'Reconnecting...';
+    web.document.title = 'Reconnecting...';
     _errorDialog ??= ConstantDialog('Connection Error')
       ..addParagraph('''The $appName server seems to be offline.
         It's probably under maintenance or loading a cool new feature.
@@ -101,7 +111,7 @@ class FrontSocket extends Socket {
       ..addParagraph('''The server should be back up
         in a few minutes or seconds, even.
         As soon as possible, you will be automatically reconnected!''')
-      ..append(icon('spinner')..classes.add('spinner'))
+      ..append(icon('spinner')..classList.add('spinner'))
       ..display();
 
     _retryTimer = Timer(Duration(seconds: 10), () => connect());
@@ -115,7 +125,13 @@ class FrontSocket extends Socket {
   }
 
   @override
-  Stream get messageStream => _webSocket!.onMessage.map((event) => event.data);
+  Stream get messageStream {
+    final controller = StreamController.broadcast();
+    _webSocket!.addEventListener('message', ((web.MessageEvent event) {
+      controller.add(event.data);
+    }).toJS);
+    return controller.stream;
+  }
 
   @override
   Future<void> send(data) async {
@@ -150,7 +166,7 @@ class FrontSocket extends Socket {
 
   @override
   void handleBinary(data) async {
-    if (data is Blob) {
+    if (data is web.Blob) {
       var bytes = await blobToBytes(data);
       var port = bytes.first;
 

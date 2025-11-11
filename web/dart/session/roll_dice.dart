@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:html';
+import 'dart:js_interop';
 import 'dart:math';
 
 import 'package:dungeonclub/actions.dart';
 import 'package:dungeonclub/dice_parser.dart';
 import 'package:dungeonclub/iterable_extension.dart';
+import 'package:web/web.dart' as web;
 
 import '../../main.dart';
 import '../communication.dart';
@@ -14,7 +16,7 @@ import 'log.dart';
 const maxRolls = 5;
 
 ButtonElement get _button => queryDom('#diceTab');
-final TableElement _table = _button.queryDom('table#dice');
+final TableElement _table = (_button as dynamic).queryDom('table#dice');
 final ElementList _visButtons = querySelectorAll('.roll-visibility');
 
 Timer? _rollTimer;
@@ -27,8 +29,8 @@ set rollPublic(bool public) {
 
   var icon = public ? 'user-group' : 'user-lock';
   for (var btn in _visButtons) {
-    btn.queryDom('i').className = 'fas fa-$icon';
-    btn.queryDom('span').text = public ? 'Public' : 'Private';
+    (btn as dynamic).queryDom('i').className = 'fas fa-$icon';
+    (btn as dynamic).queryDom('span').textContent = public ? 'Public' : 'Private';
   }
 }
 
@@ -53,16 +55,18 @@ void initDiceTable() {
   }
 
   [4, 6, 8, 10, 12, 20, 100].forEach((sides) {
-    var row = TableRowElement();
-    row.append(TableCellElement()
-      ..text = 'd$sides'
-      ..onClick.listen((_) => sendSingleRoll(sides, 1)));
+    var row = web.document.createElement('tr') as web.HTMLTableRowElement;
+    var firstCell = web.document.createElement('td') as web.HTMLTableCellElement;
+    firstCell.textContent = 'd$sides';
+    firstCell.addEventListener('click', (web.Event _) { sendSingleRoll(sides, 1); }.toJS);
+    row.appendChild(firstCell);
 
     for (var i = 2; i <= maxRolls; i++) {
-      row.append(TableCellElement()
-        ..onClick.listen((_) => sendSingleRoll(sides, i + offset)));
+      var cell = web.document.createElement('td') as web.HTMLTableCellElement;
+      cell.addEventListener('click', (web.Event _) { sendSingleRoll(sides, i + offset); }.toJS);
+      row.appendChild(cell);
     }
-    _table.append(row);
+    (_table as dynamic).append(row);
   });
 }
 
